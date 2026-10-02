@@ -1,6 +1,6 @@
 # Plano Técnico — Motor de Cálculo de Reembolso
 
-**Versão:** 1.1 · **Baseado na spec:** 1.1
+**Versão:** 1.2 · **Baseado na spec:** 1.2
 
 > Aqui mora o COMO. Este arquivo pode e deve falar de linguagem, biblioteca e
 > arquitetura. O que ele **não** pode é introduzir regra de negócio nova — se
@@ -29,21 +29,22 @@ src/
 ├── engine.js       → orquestra as fases de processamento; retorna resultado completo
 ├── rules/
 │   ├── normalize.js    → fase 1: normalização de categoria
-│   ├── periodo.js      → fase 2: filtro de período de competência (RN-007)
-│   ├── duplicatas.js   → fase 3: detecção e marcação de duplicatas (RN-009)
-│   ├── estornos.js     → fase 4: compensação de estornos (RN-008)
-│   ├── categoria.js    → fase 5: validação de categoria permitida (RN-006)
-│   ├── nota-fiscal.js  → fase 6: exigência de nota fiscal (RN-005)
-│   ├── diarias.js      → fase 7: inferência de diárias para hospedagem (AMB-003)
-│   └── limites.js      → fase 8: aplicação de limites diários (RN-001, RN-002, RN-003)
-├── arredondamento.js   → fase 9: arredondamento half-up (RN-010)
+│   ├── valor-zero.js   → fase 2: rejeição de valor zero (RN-011)
+│   ├── periodo.js      → fase 3: filtro de período de competência (RN-007)
+│   ├── duplicatas.js   → fase 4: detecção e marcação de duplicatas (RN-009)
+│   ├── estornos.js     → fase 5: compensação de estornos (RN-008)
+│   ├── categoria.js    → fase 6: validação de categoria permitida (RN-006)
+│   ├── nota-fiscal.js  → fase 7: exigência de nota fiscal (RN-005)
+│   ├── diarias.js      → fase 8: inferência de diárias para hospedagem (AMB-003)
+│   └── limites.js      → fase 9: aplicação de limites diários (RN-001, RN-002, RN-003)
+├── arredondamento.js   → fase 10: arredondamento half-up (RN-010)
 └── resumo.js           → calcula total_solicitado, total_reembolsavel, total_recusado
 ```
 
 **Fluxo:**
 ```
-arquivo JSON → loader.js → engine.js → [normalize → periodo → duplicatas →
-estornos → categoria → nota-fiscal → diarias → limites → arredondamento] →
+arquivo JSON → loader.js → engine.js → [normalize → valor-zero → periodo →
+duplicatas → estornos → categoria → nota-fiscal → diarias → limites → arredondamento] →
 resumo.js → objeto resultado → cli.js → arquivo JSON de saída
 ```
 
@@ -117,7 +118,7 @@ export const LIMITE_NOTA_FISCAL_CENTAVOS = 10000; // R$ 100,00
 
 ### DT-002 — Pipeline de fases sequencial explícito
 
-**Contexto:** a spec define uma ordem estrita de aplicação de 9 regras (seção 8). Uma implementação que mistura as regras numa única função é difícil de testar e de modificar.
+**Contexto:** a spec define uma ordem estrita de aplicação de 10 regras (seção 8, spec v1.2). Uma implementação que mistura as regras numa única função é difícil de testar e de modificar.
 
 **Decisão:** cada fase é uma função pura que recebe o array de despesas (com estado acumulado) e retorna o mesmo array modificado. O `engine.js` encadeia as fases em ordem. Nenhuma fase conhece as outras.
 
@@ -169,7 +170,8 @@ tests/
 │   ├── RN-007-periodo.test.js
 │   ├── RN-008-estornos.test.js
 │   ├── RN-009-duplicatas.test.js
-│   └── RN-010-arredondamento.test.js
+│   ├── RN-010-arredondamento.test.js
+│   └── RN-011-valor-zero.test.js
 └── integracao/
     └── despesas-exemplo.test.js   ← processa o JSON completo, verifica cada item
 ```
