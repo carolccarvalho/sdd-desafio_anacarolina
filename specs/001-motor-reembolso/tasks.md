@@ -1,178 +1,219 @@
 # Tasks — Motor de Cálculo de Reembolso
 
-> Cada task é pequena o bastante para virar **um commit**. Se você não consegue
-> descrever o critério de aceite como "o teste X passa", a task está grande demais.
->
-> Marque `[x]` conforme conclui — ao longo do caminho, não tudo no fim. O histórico
-> de quando cada task foi marcada é lido na correção.
-
-**Formato do commit:** `feat(T-003): <descrição>` · `test(T-003): <descrição>`
-
----
+> Tasks pequenas o bastante para commits rastreáveis. Cada task identifica
+> requisitos/decisões, dependências, aceite verificável, testes e commit sugerido.
 
 ## Fase 1 — Fundação
 
-- [ ] **T-001** — Estrutura do projeto e configuração do ambiente
-  - **O que faz:** cria `package.json` com `"type": "module"`, script `start` (`node src/cli.js`) e script `test` (`node --test tests/**/*.test.js`). Cria as pastas `src/`, `src/rules/`, `tests/`, `tests/rules/`, `tests/integracao/`. Cria `src/politica.js` com os limites e categorias permitidas como constantes exportadas.
-  - **Atende:** DT-001 (aritmética em centavos), DT-003 (test runner nativo)
-  - **Aceite:** `npm test` roda sem erro (zero testes ainda, mas o runner não falha). `node -e "import('./src/politica.js').then(m => console.log(m.LIMITES))"` imprime os limites corretamente.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-001 — Fundação do projeto**
+  - **Atende:** DT-003; estrutura técnica do plano.
+  - **Depende de:** —
+  - **Aceite:** scripts `start` e `test` executam; módulos/pastas-base existem.
+  - **Testes:** smoke do runner e importação da política.
+  - **Commit:** `chore(T-001): cria fundação do projeto`
 
-- [ ] **T-002** — Loader: leitura e validação do JSON de entrada
-  - **O que faz:** implementa `src/loader.js` que lê o arquivo passado como caminho, faz parse do JSON e valida presença dos campos obrigatórios (`colaborador.id`, `colaborador.nome`, `colaborador.centro_custo`, `periodo.competencia`, `periodo.inicio`, `periodo.fim`, `despesas[]` com `id`, `data`, `categoria`, `descricao`, `fornecedor`, `valor`, `tem_nota_fiscal`). Lança erro com mensagem clara se inválido.
-  - **Atende:** spec seção 4.1
-  - **Aceite:** teste `tests/rules/loader.test.js` — JSON válido retorna objeto estruturado; JSON sem campo obrigatório lança erro com mensagem que identifica o campo faltante.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-002 — Loader e contrato estrutural de entrada**
+  - **Atende:** spec 4.1; A9/D-003.
+  - **Faz:** lê JSON, valida campos, tipos e formatos; valida `periodo.competencia` apenas como `AAAA-MM`; não exige correspondência com início/fim; preserva valores com mais de duas casas.
+  - **Depende de:** T-001.
+  - **Aceite:** JSON válido, JSON inválido, campo ausente, formato de competência inválido e competência divergente das datas são testados; somente o formato inválido falha.
+  - **Testes:** `tests/loader.test.js`.
+  - **Commit:** `feat(T-002): valida entrada e competência informativa`
 
-- [ ] **T-003** — Arredondamento half-up (RN-010)
-  - **O que faz:** implementa `src/arredondamento.js` com função `arredondarHalfUp(centavos)` que converte centavos inteiros para reais com duas casas decimais usando half-up. Implementa também `paracentavos(valor)` que converte reais para centavos inteiros (`Math.round(valor * 100)`).
-  - **Atende:** RN-010, AMB-009
-  - **Aceite:** teste `tests/rules/RN-010-arredondamento.test.js` — `3333` centavos → `33.33`; `3334` → `33.34`; `3335` → `33.35` (half-up); `paracentavos(33.333)` → `3333`.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-003 — Representação monetária e arredondamento final**
+  - **Atende:** RN-010, AMB-009, A4/D-003.
+  - **Faz:** preserva `valor_original`; fornece operações decimais exatas e arredondamento half-up na saída.
+  - **Depende de:** T-001.
+  - **Aceite:** `33.333` permanece exato internamente e sai como `33.33`; soma de originais é arredondada somente no total; conversões não perdem escala.
+  - **Testes:** `tests/rules/RN-010-arredondamento.test.js`.
+  - **Commit:** `feat(T-003): preserva precisão e arredonda valores finais`
 
----
+## Fase 2 — Fases preliminares
 
-## Fase 2 — Regras de negócio (pipeline de fases)
+- [ ] **T-004 — Normalização de categorias e aliases**
+  - **Atende:** RN-006, RN-009, AMB-007, A8/D-003.
+  - **Faz:** normaliza caixa e aplica somente alias `alimentação` → `alimentacao`; preserva posição original.
+  - **Depende de:** T-001.
+  - **Aceite:** `ALIMENTACAO`, `alimentação` e `alimentacao` produzem `alimentacao`; alias desconhecido não é aceito como permitido.
+  - **Testes:** `tests/rules/RN-006-categoria.test.js`.
+  - **Commit:** `feat(T-004): normaliza categorias e aliases canônicos`
 
-- [ ] **T-004** — Fase 1: normalização de categoria (AMB-007)
-  - **O que faz:** implementa `src/rules/normalize.js` — função que recebe array de despesas e retorna novo array com `categoria` convertida para minúsculas em todos os itens.
-  - **Atende:** RN-006, RN-009, AMB-007
-  - **Aceite:** teste `tests/rules/RN-006-categoria.test.js` — `"ALIMENTACAO"` → `"alimentacao"`; `"Transporte_Urbano"` → `"transporte_urbano"`.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-005 — Filtro de período antes de valor zero**
+  - **Atende:** RN-007, AMB-006, A6/D-003.
+  - **Faz:** ignora datas fora do intervalo inclusivo antes de qualquer validação de zero.
+  - **Depende de:** T-002, T-004.
+  - **Aceite:** item fora do período, inclusive com valor zero, é `ignorado`; primeiro e último dia são processados; competência divergente não altera o resultado.
+  - **Testes:** `tests/rules/RN-007-periodo.test.js`.
+  - **Commit:** `feat(T-005): filtra competência antes de validar valor`
 
-- [ ] **T-005** — Fase 3: filtro de período de competência (RN-007)
-  - **O que faz:** implementa `src/rules/periodo.js` — função que marca como `ignorado` despesas cuja `data` está fora de `[periodo.inicio, periodo.fim]`.
-  - **Atende:** RN-007, AMB-006
-  - **Aceite:** teste `tests/rules/RN-007-periodo.test.js` — d-008 (2026-04-15, período 2026-07) → `status: 'ignorado'`; despesa no primeiro dia do período → não ignorada; despesa no último dia → não ignorada.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-006 — Deduplicação determinística**
+  - **Atende:** RN-009, AMB-008.
+  - **Depende de:** T-004, T-005.
+  - **Aceite:** primeira posição permanece principal; duplicata comum e estorno duplicado são ignorados; ordem lexicográfica do ID não interfere.
+  - **Testes:** `tests/rules/RN-009-duplicatas.test.js`.
+  - **Commit:** `feat(T-006): deduplica pela primeira posição do array`
 
-- [ ] **T-006** — Fase 4: detecção de duplicatas (RN-009)
-  - **O que faz:** implementa `src/rules/duplicatas.js` — função que identifica despesas com mesma data + categoria (normalizada) + fornecedor (case-insensitive) + valor, mantendo a **primeira ocorrência na posição do array de entrada** como principal e marcando as demais como `ignorado`. Aplica também a estornos duplicados. Não ordena por `id` (ver DT-005 em plan.md).
-  - **Atende:** RN-009, AMB-008 (spec v1.2, D-002/A8)
-  - **Aceite:** teste `tests/rules/RN-009-duplicatas.test.js` — d-006 processada normalmente; d-007 → `status: 'ignorado'`, `motivo` referencia d-006. Dois estornos idênticos: apenas o primeiro no array é aplicado. **Caso adicional:** array com IDs fora de ordem lexicográfica (ex: `id: 'z-1'` antes de `id: 'a-9'`) — o primeiro no array é mantido como principal, não o de menor `id`.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-017 — Rejeição de valor zero**
+  - **Atende:** RN-011, A6/D-003.
+  - **Faz:** dentro do período, zero vira `recusado`; não entra em limites; participa dos conjuntos de totais com contribuição zero; negativos permanecem estornos.
+  - **Depende de:** T-005.
+  - **Aceite:** zero dentro do período é recusado; zero fora é ignorado; `0.01` é inalterado; negativo não é afetado.
+  - **Testes:** `tests/rules/RN-011-valor-zero.test.js`.
+  - **Commit:** `feat(T-017): rejeita valores zero dentro da competência`
 
-- [ ] **T-007** — Fase 5: compensação de estornos (RN-008)
-  - **O que faz:** implementa `src/rules/estornos.js` — função que identifica despesas com `valor < 0`, subtrai o valor absoluto do `valorCentavos` agregado de despesas da mesma categoria+fornecedor que já passaram pelas etapas 1–4 e **não foram recusadas nem ignoradas** (grupo compensável, conforme RN-008 spec v1.2). Se nenhuma despesa compatível, marca o estorno como `ignorado`. Se o agregado ficar ≤ 0, todas as despesas do grupo ficam com `valorCentavos = 0` e `status = 'recusado'` (AMB-011). O estorno é sempre marcado `ignorado`.
-  - **Atende:** RN-008, AMB-008, AMB-011 (spec v1.2, D-002/A1, D-002/A13)
-  - **Aceite:** teste `tests/rules/RN-008-estornos.test.js` — d-009 (−R$45) reduz total de `transporte_urbano`+`TaxiApp` em R$45; estorno sem grupo compatível → `ignorado`; estorno maior que o grupo → grupo com `valorCentavos = 0`. **Caso adicional:** estorno em grupo cuja única despesa já foi recusada por nota fiscal (etapa posterior) → estorno é `ignorado` como "sem despesa correspondente".
-  - **Commit:** _(preenchido após execução)_
+## Fase 3 — Estornos e validações
 
-- [ ] **T-008** — Fase 6: validação de categoria permitida (RN-006)
-  - **O que faz:** implementa `src/rules/categoria.js` — função que marca como `recusado` despesas com categoria não presente em `CATEGORIAS_PERMITIDAS` (já normalizada).
-  - **Atende:** RN-006
-  - **Aceite:** teste `tests/rules/RN-006-categoria.test.js` (ampliado) — `coworking` → `recusado`; `alimentacao` → não recusada por esta regra.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-007A — Associação de estornos**
+  - **Atende:** RN-008, AMB-008, A1/A2/D-003.
+  - **Faz:** associa estornos não duplicados a grupos candidatos após período/zero/deduplicação, sem alterar valores; ordena estornos pela posição do array.
+  - **Depende de:** T-004, T-005, T-006, T-017.
+  - **Aceite:** d-009 é associado a d-003/d-004; associação não muda valores; múltiplos estornos preservam a ordem.
+  - **Testes:** `tests/rules/RN-008-associacao-estornos.test.js`.
+  - **Commit:** `feat(T-007A): associa estornos sem aplicar compensação`
 
-- [ ] **T-009** — Fase 7: exigência de nota fiscal (RN-005)
-  - **O que faz:** implementa `src/rules/nota-fiscal.js` — função que marca como `recusado` despesas com `valorCentavos > 10000` e `tem_nota_fiscal = false`.
-  - **Atende:** RN-005, AMB-004
-  - **Aceite:** teste `tests/rules/RN-005-nota-fiscal.test.js` — d-003 (R$100,00 sem nota) → não recusada; d-004 (R$100,01 sem nota) → `recusado`; d-013 (R$690,00 sem nota) → `recusado`.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-008 — Validação de categoria permitida**
+  - **Atende:** RN-006.
+  - **Depende de:** T-004, T-007A.
+  - **Aceite:** categoria não permitida é recusada; categorias canônicas não são recusadas.
+  - **Testes:** `tests/rules/RN-006-categoria.test.js`.
+  - **Commit:** `feat(T-008): valida categorias permitidas`
 
-- [ ] **T-010** — Fase 7: inferência de diárias para hospedagem (AMB-003)
-  - **O que faz:** implementa `src/rules/diarias.js` — função que, para despesas de `hospedagem` com `status` ainda não definido, aplica regex `/(\d+)\s*(?:di[aá]rias?|noites?)/i` na `descricao`. Se encontrar, preenche `num_diarias`; se não encontrar, marca como `recusado`.
-  - **Atende:** RN-003, AMB-003
-  - **Aceite:** teste `tests/rules/RN-003-hospedagem.test.js` — `"Hotel Rio - 2 diárias"` → `num_diarias = 2`; `"Airbnb 3 noites"` → `num_diarias = 3`; `"Hospedagem executiva"` → `recusado` com motivo adequado.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-009 — Nota fiscal sobre valor original**
+  - **Atende:** RN-005, AMB-004, A1/D-003.
+  - **Faz:** compara sempre `valor_original`, sem usar valor efetivo após estorno.
+  - **Depende de:** T-008.
+  - **Aceite:** R$100,00 sem nota passa; R$100,01 sem nota recusa; estorno não reduz a base da decisão.
+  - **Testes:** `tests/rules/RN-005-nota-fiscal.test.js`.
+  - **Commit:** `feat(T-009): valida nota fiscal pelo valor original`
 
-- [ ] **T-011** — Fase 9: aplicação de limites diários (RN-001, RN-002, RN-003)
-  - **O que faz:** implementa `src/rules/limites.js` — função que agrupa despesas elegíveis (não recusadas, não ignoradas) por `data` + `categoria`, calcula o total do dia em centavos, compara com o limite da categoria (para hospedagem: `num_diarias × 25000`). Se total ≤ limite: `aprovado`. Se total > limite: distribuição proporcional → `aprovado_parcial`. Despesas recusadas/ignoradas são excluídas do agrupamento (AMB-010).
-  - **Atende:** RN-001, RN-002, RN-003, RN-004, AMB-001, AMB-010
-  - **Aceite:** teste `tests/rules/RN-001-alimentacao.test.js` — d-001+d-002 → soma R$60,00 proporcional. Teste `tests/rules/RN-002-transporte.test.js` — d-003 após estorno d-009 com valor efetivo R$55,00 (< R$80,00) → `aprovado` R$55,00 (D-002/A2). Teste `tests/rules/RN-003-hospedagem.test.js` — d-010 R$480,00 / 2 diárias → `aprovado`; R$900,00 / 3 diárias → `aprovado_parcial` R$750,00 (dado sintético — ver nota em RN-003 da spec).
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-010 — Contrato de diárias**
+  - **Atende:** RN-003, AMB-003, A5/D-003.
+  - **Faz:** aceita exatamente um número inteiro positivo em algarismos imediatamente antes de `diária(s)` ou `noite(s)`; rejeita número depois, por extenso, zero, negativo ou múltiplos candidatos.
+  - **Depende de:** T-008, T-009.
+  - **Aceite:** padrões válidos preenchem `num_diarias`; todos os inválidos recusam com motivo especificado.
+  - **Testes:** `tests/rules/RN-003-diarias.test.js`.
+  - **Commit:** `feat(T-010): valida contrato de diárias`
 
----
+- [ ] **T-007B — Aplicação efetiva de estornos**
+  - **Atende:** RN-008, AMB-010, AMB-011, A1/A2/D-003.
+  - **Faz:** após categoria, nota e diárias, aplica estornos somente a elegíveis, sequencialmente por posição; não permite valor efetivo negativo.
+  - **Depende de:** T-007A, T-008, T-009, T-010.
+  - **Aceite:** d-004 recusada não recebe abatimento; d-009 reduz d-003; dois estornos atravessam mais de uma despesa pela ordem; excedente não migra de grupo.
+  - **Testes:** `tests/rules/RN-008-aplicacao-estornos.test.js`.
+  - **Commit:** `feat(T-007B): aplica estornos somente a despesas elegíveis`
 
-## Fase 3 — Orquestração e resumo
+## Fase 4 — Limites e saída
 
-- [ ] **T-012** — Engine: orquestração do pipeline completo
-  - **O que faz:** implementa `src/engine.js` — função `calcular(entrada)` que recebe o objeto da entrada, enriquece as despesas com `valorCentavos` e campos iniciais (`status: 'pendente'`, `valorReembolsavelCentavos`, `num_diarias: null`, `motivo: ''`), encadeia as **10 fases** em ordem (normalize → valor-zero → periodo → duplicatas → estornos → categoria → nota-fiscal → diarias → limites → arredondamento) e retorna o array de despesas processadas.
-  - **Atende:** spec seção 8 (spec v1.2, D-002/A5, D-002/A9)
-  - **Aceite:** teste `tests/integracao/despesas-exemplo.test.js` parcial — engine processa a entrada sem lançar erro e retorna array com 14 itens, todos com `status` diferente de `'pendente'`.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-011A — Agrupamento e limites diários**
+  - **Atende:** RN-001, RN-002, RN-003, RN-004, AMB-001, AMB-010, A3/D-003.
+  - **Faz:** agrupa alimentação/transporte por data+categoria; hospedagem por data; soma limites individuais de hospedagem.
+  - **Depende de:** T-007B, T-010.
+  - **Aceite:** hospedagens na mesma data com diárias diferentes usam soma de `num_diarias × 250`; recusadas/ignoradas não entram; grupos abaixo, iguais e acima do limite são classificados corretamente. Na ausência do campo de viagem na entrada, os limites-base são usados sem multiplicador de viagem.
+  - **Testes:** `tests/rules/RN-001-alimentacao.test.js`, `RN-002-transporte.test.js`, `RN-003-hospedagem.test.js`, incluindo caso sem `em_viagem`.
+  - **Commit:** `feat(T-011A): calcula limites diários e grupos de hospedagem`
 
-- [ ] **T-013** — Resumo: cálculo dos totais (spec seção 4.2)
-  - **O que faz:** implementa `src/resumo.js` — função que recebe o array de despesas processadas e calcula `total_solicitado` (soma de `valor_original` de itens `aprovado`, `aprovado_parcial`, `recusado`), `total_reembolsavel` (soma de `valor_reembolsavel` de `aprovado` e `aprovado_parcial`) e `total_recusado` (`total_solicitado − total_reembolsavel`). Aplica arredondamento nos totais.
-  - **Atende:** spec seção 4.2, AMB-010 (itens ignorados excluídos dos totais)
-  - **Aceite:** teste `tests/rules/resumo.test.js` — totais corretos para array com mix de status; `total_solicitado = total_reembolsavel + total_recusado` sempre.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-011B — Distribuição proporcional e resíduos**
+  - **Atende:** RN-001/RN-002/RN-003/RN-010, A4/D-003.
+  - **Faz:** calcula proporções, trunca inicialmente, distribui centavos pelos maiores restos e desempata pela posição original.
+  - **Depende de:** T-003, T-011A.
+  - **Aceite:** soma de grupo limitado é exatamente o limite; casos com resíduos e empate são determinísticos.
+  - **Testes:** `tests/rules/distribuicao-residuos.test.js`.
+  - **Commit:** `feat(T-011B): fecha limites com distribuição de resíduos`
 
----
+- [ ] **T-011C — Auditoria de hospedagem**
+  - **Atende:** RN-003, seção 4.2, A7/D-003.
+  - **Faz:** produz `num_diarias`, `limite_unitario_diaria`, `limite_item` e `limite_grupo`; repete o limite de grupo por data; omite campos quando inaplicáveis.
+  - **Depende de:** T-010, T-011A.
+  - **Aceite:** campos existem somente em hospedagens elegíveis com diárias; valores têm duas casas; limite de grupo é igual em todos os itens da data; nenhum campo é `null` ou aparece em outras categorias.
+  - **Testes:** `tests/rules/RN-003-hospedagem-auditoria.test.js`.
+  - **Commit:** `feat(T-011C): adiciona auditoria de hospedagens`
 
-## Fase 4 — CLI e integração ponta-a-ponta
+- [ ] **T-012 — Orquestração da pipeline de 11 etapas**
+  - **Atende:** seção 8, A1/A6/D-003.
+  - **Faz:** encadeia exatamente as 11 etapas na ordem da spec, incluindo associação separada da aplicação de estornos.
+  - **Depende de:** T-004, T-005, T-006, T-017, T-007A, T-008, T-009, T-010, T-007B, T-011A, T-011B, T-011C.
+  - **Aceite:** integração verifica ordem, nenhum item permanece pendente e conflitos produzem o status esperado.
+  - **Testes:** `tests/integracao/pipeline.test.js`.
+  - **Commit:** `feat(T-012): orquestra pipeline de onze etapas`
 
-- [ ] **T-014** — CLI: ponto de entrada com `--input` e `--output`
-  - **O que faz:** implementa `src/cli.js` — lê `--input` e `--output` de `process.argv`, chama `loader.js`, chama `engine.js`, monta o objeto de saída (com `colaborador`, `periodo`, `processado_em`, `resumo`, `itens`), serializa para JSON com 2 espaços de indentação e escreve no arquivo de saída. Erros de leitura/validação são impressos em `stderr` e encerram com código 1.
-  - **Atende:** spec seção 4.2, DESAFIO.md (interface CLI)
-  - **Aceite:** `node src/cli.js --input exemplos/despesas-exemplo.json --output /tmp/resultado.json` roda sem erro e produz JSON válido com todos os campos da spec.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-013 — Resumo e totais**
+  - **Atende:** seção 4.2, RN-010, RN-011.
+  - **Depende de:** T-003, T-012.
+  - **Aceite:** ignora itens `ignorado`; inclui recusados e zero no conjunto lógico; preserva precisão de originais; satisfaz invariante dos totais.
+  - **Testes:** `tests/rules/resumo.test.js`, incluindo lista vazia.
+  - **Commit:** `feat(T-013): calcula resumo e invariante financeira`
 
-- [ ] **T-015** — Teste de integração ponta-a-ponta com `despesas-exemplo.json`
-  - **O que faz:** implementa `tests/integracao/despesas-exemplo.test.js` completo — processa o arquivo de exemplo e verifica cada item individualmente contra os critérios de aceite da spec seção 9 (spec v1.2).
-  - **Atende:** todos os critérios de aceite da spec seção 9
-  - **Aceite:** todos os asserts passam:
-    - d-001 + d-002: soma `valor_reembolsavel` = R$60,00 (±R$0,01)
-    - d-003: não recusada por nota fiscal; `valor_reembolsavel` = **R$55,00** (`aprovado`, após estorno d-009 — D-002/A2)
-    - d-004: `status = 'recusado'`, motivo contém "nota fiscal"
-    - d-005: `status = 'recusado'`, motivo contém "categoria"
-    - d-006: processada; d-007: `status = 'ignorado'`
-    - d-008: `status = 'ignorado'`
-    - d-009: `status = 'ignorado'`
-    - d-010: `status = 'aprovado'`, `valor_reembolsavel = 480.00`
-    - d-011: `valor_reembolsavel = 33.33`
-    - d-013: `status = 'recusado'`
-    - d-014: tratada como `alimentacao`
-    - `resumo.total_solicitado` = R$1.765,94
-    - `resumo.total_reembolsavel` = R$791,43
-    - `resumo.total_recusado` = R$974,51
-    - invariante: `total_solicitado = total_reembolsavel + total_recusado`
-  - **Commit:** _(preenchido após execução)_
+## Fase 5 — CLI e integração
 
-- [ ] **T-016** — README com instruções de execução e teste
-  - **O que faz:** escreve `README.md` com: pré-requisitos (Node.js ≥ 20), como instalar (nenhum `npm install` necessário — zero dependências), como rodar (`node src/cli.js --input ... --output ...`), como testar (`npm test`), exemplo de saída.
-  - **Atende:** rubrica (penalidade se README não permite rodar o projeto)
-  - **Aceite:** alguém que nunca viu o projeto consegue rodar e testar seguindo apenas o README.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-014A — CLI de sucesso**
+  - **Atende:** saída 4.2 e interface do desafio, incluindo `processado_em`.
+  - **Depende de:** T-002, T-012, T-013.
+  - **Aceite:** `--input` e `--output` produzem JSON válido com schema completo e campos de hospedagem condicionais; `processado_em` é uma string ISO 8601 UTC válida terminada em `Z`, sem comparação do instante exato.
+  - **Testes:** `tests/integracao/cli-sucesso.test.js`, incluindo validação de `processado_em`.
+  - **Commit:** `feat(T-014A): implementa execução bem-sucedida da CLI`
 
----
+- [ ] **T-014B — Erros da CLI**
+  - **Atende:** contrato operacional de entrada/saída.
+  - **Depende de:** T-014A, T-002.
+  - **Aceite:** argumentos ausentes, arquivo inexistente e JSON inválido produzem mensagem em `stderr`, código não zero e nenhum resultado enganoso.
+  - **Testes:** `tests/integracao/cli-erros.test.js`.
+  - **Commit:** `feat(T-014B): trata erros de argumentos e entrada na CLI`
 
-## Fase 5 — Envelope (criar no Dia 2)
+- [ ] **T-015A — Integração do arquivo de exemplo**
+  - **Atende:** seção 9; D-003 A1–A9, exceto confirmação numérica dos totais.
+  - **Depende de:** T-012, T-013, T-014A.
+  - **Aceite:** verifica cada item, d-003/d-004/d-009, d-010 e seus campos de auditoria, aliases, resíduos, itens ignorados, schema de saída e lista de despesas vazia; não fixa totais ainda não recalculados.
+  - **Testes:** `tests/integracao/despesas-exemplo.test.js` e caso de entrada vazia.
+  - **Commit:** `test(T-015A): valida integração do arquivo de exemplo`
 
-_Tasks a partir da mudança de requisito do dia 2. Numeração continua de T-018 em diante (T-017 reservada para RN-011 abaixo)._
+- [ ] **T-015B — Recálculo e confirmação dos totais de integração**
+  - **Atende:** seção 9, invariante dos totais e D-003 A4/A6.
+  - **Depende de:** T-015A.
+  - **Aceite:** recalcula `total_solicitado`, `total_reembolsavel` e `total_recusado` a partir da saída real; confirma ou registra a atualização dos valores esperados e verifica `total_solicitado = total_reembolsavel + total_recusado`.
+  - **Testes:** `tests/integracao/totais-exemplo.test.js`.
+  - **Commit:** `test(T-015B): confirma totais de integração`
 
----
+- [ ] **T-016 — README operacional**
+  - **Atende:** rubrica de execução.
+  - **Depende de:** T-014A, T-014B.
+  - **Aceite:** pessoa sem contexto executa e testa seguindo apenas o README.
+  - **Testes:** checklist manual documentado.
+  - **Commit:** `docs(T-016): documenta execução e testes`
 
-## Fase 2 (adendo) — RN-011: valor zero
+- [ ] **T-018 — Registro e organização das sessões**
+  - **Atende:** DESAFIO.md, seção de sessões exportadas; RUBRICA.md, critério de relatório.
+  - **Depende de:** cada sessão de trabalho relevante e T-016.
+  - **Aceite:** `docs/sessions/` contém exports nomeados sequencialmente, não vazios, cobrindo decisões, implementação, testes e mudanças de requisito.
+  - **Testes:** checklist documental: arquivos existem, nomes seguem `NN-descricao-curta.md` e cada export contém evidência da sessão.
+  - **Commit:** `docs(T-018): organiza exports das sessões`
 
-- [ ] **T-017** — Fase 2: rejeição de valor zero (RN-011)
-  - **O que faz:** implementa `src/rules/valor-zero.js` — função que marca como `recusado` (motivo "Valor zero não é uma despesa válida") qualquer despesa com `valor = 0`. Não afeta estornos (valor < 0) nem despesas válidas (valor > 0).
-  - **Atende:** RN-011 (spec v1.2, D-002/A9)
-  - **Aceite:** teste `tests/rules/RN-011-valor-zero.test.js` — despesa com `valor = 0` → `status = 'recusado'`, `valor_reembolsavel = 0`, motivo contém "zero"; despesa com `valor = 0.01` → não afetada; despesa com `valor = -1` (estorno) → não afetada por esta fase.
-  - **Commit:** _(preenchido após execução)_
+- [ ] **T-019 — Relatório final com evidências**
+  - **Atende:** DESAFIO.md, seção do relatório; RUBRICA.md, critério de relatório e discernimento.
+  - **Depende de:** T-018 e histórico de commits; T-015B para os resultados finais.
+  - **Aceite:** `docs/RELATORIO.md` contém Delegação, Descrição, Discernimento, Diligência e Envelope; cita sessões e commits; documenta um caso concreto de erro do agente, como foi identificado e como foi corrigido; registra evidências verificáveis do recálculo e da mudança de requisito.
+  - **Testes:** checklist documental cruzando cada afirmação com arquivo de sessão, commit ou teste citado.
+  - **Commit:** `docs(T-019): elabora relatório final com evidências`
 
----
+## Cobertura de rastreabilidade
 
-## Cobertura
-
-| Regra da spec | Task | Teste |
+| Requisito/decisão | Tasks | Testes |
 |---|---|---|
-| RN-001 | T-011 | `tests/rules/RN-001-alimentacao.test.js` |
-| RN-002 | T-011 | `tests/rules/RN-002-transporte.test.js` |
-| RN-003 | T-010, T-011 | `tests/rules/RN-003-hospedagem.test.js` |
-| RN-004 | T-011 | `tests/rules/RN-001-alimentacao.test.js`, `RN-002-transporte.test.js` |
-| RN-005 | T-009 | `tests/rules/RN-005-nota-fiscal.test.js` |
-| RN-006 | T-004, T-008 | `tests/rules/RN-006-categoria.test.js` |
-| RN-007 | T-005 | `tests/rules/RN-007-periodo.test.js` |
-| RN-008 | T-007 | `tests/rules/RN-008-estornos.test.js` |
-| RN-009 | T-006 | `tests/rules/RN-009-duplicatas.test.js` |
-| RN-010 | T-003 | `tests/rules/RN-010-arredondamento.test.js` |
-| RN-011 | T-017 | `tests/rules/RN-011-valor-zero.test.js` |
-| AMB-001 | T-011 | `tests/rules/RN-001-alimentacao.test.js` |
-| AMB-003 | T-010 | `tests/rules/RN-003-hospedagem.test.js` |
-| AMB-004 | T-009 | `tests/rules/RN-005-nota-fiscal.test.js` |
-| AMB-007 | T-004 | `tests/rules/RN-006-categoria.test.js` |
-| AMB-008 | T-006, T-007 | `tests/rules/RN-009-duplicatas.test.js`, `RN-008-estornos.test.js` |
-| AMB-009 | T-003 | `tests/rules/RN-010-arredondamento.test.js` |
-| AMB-010 | T-011 | `tests/rules/RN-002-transporte.test.js` |
-| AMB-011 | T-007 | `tests/rules/RN-008-estornos.test.js` |
+| RN-001 | T-011A, T-011B | RN-001; resíduos |
+| RN-002 | T-011A, T-011B | RN-002; resíduos |
+| RN-003 | T-010, T-011A, T-011B, T-011C | diárias, hospedagem, auditoria |
+| RN-004 | T-011A, T-011B | limites parciais |
+| RN-005/A1 | T-009, T-007B | nota por original; integração estorno |
+| RN-006/A8 | T-004, T-008 | aliases/categorias |
+| RN-007/A6/A9 | T-002, T-005 | período e competência |
+| RN-008/A1/A2 | T-007A, T-007B | associação, aplicação, múltiplos |
+| RN-009 | T-006 | duplicatas |
+| RN-010/A4 | T-003, T-011B | precisão e resíduos |
+| RN-011/A6 | T-005, T-017, T-013 | zero dentro/fora e totais |
+| Saída hospedagem/A7 | T-011C, T-014A | campos e omissão |
+| CLI e erros | T-014A, T-014B | sucesso e falhas |
+| Integração | T-015 | exemplo completo e totais |
+| Lista vazia | T-013, T-015 | resumo vazio e integração |
+
+## Ordem sugerida de implementação
+
+T-001 → T-002 → T-003 → T-004 → T-005 → T-006 → T-017 → T-007A → T-008 → T-009 → T-010 → T-007B → T-011A → T-011B → T-011C → T-012 → T-013 → T-014A → T-014B → T-015A → T-015B → T-016 → T-018 → T-019.
