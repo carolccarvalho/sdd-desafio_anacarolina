@@ -1,4 +1,4 @@
-const DECIMAL_LEXEM = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+const DECIMAL_LEXEM = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 
 function assertScale(scale) {
   if (!Number.isInteger(scale) || scale < 0) throw new RangeError('scale deve ser inteiro não negativo');
@@ -28,10 +28,16 @@ export function fromDecimalLexeme(lexeme) {
   if (typeof lexeme !== 'string' || !DECIMAL_LEXEM.test(lexeme)) throw new SyntaxError('lexema decimal inválido');
   const negative = lexeme.startsWith('-');
   const unsigned = lexeme.replace(/^[+-]/, '');
-  const [integerPart, fractionPart = ''] = unsigned.split('.');
+  const [coefficient, exponentText = '0'] = unsigned.split(/[eE]/);
+  const exponent = Number(exponentText);
+  const [integerPart, fractionPart = ''] = coefficient.split('.');
   const digits = `${integerPart}${fractionPart}`.replace(/^0+(?=\d)/, '') || '0';
-  const units = BigInt(digits) * (negative ? -1n : 1n);
-  return fromUnits(units, fractionPart.length);
+  const scale = Math.max(0, fractionPart.length - exponent);
+  const adjustedDigits = exponent >= fractionPart.length
+    ? `${digits}${'0'.repeat(exponent - fractionPart.length)}`
+    : digits;
+  const units = BigInt(adjustedDigits) * (negative ? -1n : 1n);
+  return fromUnits(units, scale);
 }
 
 export function normalize(decimal) {
