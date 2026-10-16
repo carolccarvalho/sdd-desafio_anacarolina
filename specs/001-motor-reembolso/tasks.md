@@ -37,13 +37,29 @@
   - **Testes:** `tests/loader.test.js` e `tests/rules/parser-json.test.js`.
   - **Commit:** `feat(T-003B): preserva lexemas no parser monetário`
 
-- [ ] **T-003C — Serialização monetária e migração de fronteira**
-  - **Atende:** RN-010, seção 4.2, D-004 e critérios de saída.
-  - **Faz:** impede que valores monetários internos cheguem diretamente ao `JSON.stringify`; converte valores finais para números de saída somente após arredondamento; verifica round-trip de centavos; adapta inicialmente loader e engine ao novo tipo.
+- [ ] **T-003C1 — Adapter lexical do loader**
+  - **Atende:** RN-010, seção 4.1, T-003B e compatibilidade de entrada.
+  - **Faz:** prepara a integração entre `parseJsonLexical` e o domínio; valida objetos de protótipo nulo com `Object.hasOwn`; converte lexemas monetários para `DecimalInterno` em adapter isolado; não substitui o fluxo ativo loader → engine.
   - **Depende de:** T-003A e T-003B.
-  - **Aceite:** valores internos são serializados somente na fronteira; `33.333` sai como `33.33`; o round-trip preserva centavos; perda silenciosa de centavos é detectada e produz erro controlado; d-011 permanece `aprovado` por decisão anterior ao arredondamento.
-  - **Testes:** `tests/rules/serializacao-monetaria.test.js`, `tests/rules/RN-010-arredondamento.test.js` e teste de fronteira do engine.
-  - **Commit:** `feat(T-003C): migra fronteiras para serialização monetária segura`
+  - **Aceite:** `33.333` chega ao adapter como `DecimalInterno` exato; `1e-3` chega como `0.001` exato; erros de JSON, estrutura e tipo continuam controlados; não há dependência de métodos herdados em objetos parseados; o loader ativo pré-migração continua compatível com o engine atual; `npm test` permanece verde.
+  - **Testes:** `tests/loader.test.js`, `tests/rules/loader-decimal-adapter.test.js` e `tests/rules/parser-json.test.js`.
+  - **Commit:** `feat(T-003C1): cria adapter lexical monetário compatível`
+
+- [ ] **T-003C2 — Migração do motor para decimal exato**
+  - **Atende:** RN-001 a RN-011, RN-010, D-004 e saída compatível.
+  - **Faz:** ativa o loader decimal; migra o estado monetário do engine, política, estornos, limites, totais e status; implementa distribuição por quociente/resto e maiores restos exatos; troca loader e engine de modo atômico.
+  - **Depende de:** T-003A, T-003B, T-003C1, T-011A e T-012.
+  - **Aceite:** nenhuma operação monetária usa `Number`; limites entram como lexemas ou `DecimalInterno`; d-003, d-011 e d-014 preservam os comportamentos v1.4; `100.000 − 45.123 = 54.877` internamente; grupos limitados fecham exatamente em centavos; empates matemáticos usam `posicaoEntrada`; resumo usa decimal exato; formato externo permanece compatível com a CLI atual; testes anteriores e novos passam.
+  - **Testes:** regras de estorno, limites, resumo, distribuição e integração do exemplo.
+  - **Commit:** `feat(T-003C2): migra engine para decimal exato`
+
+- [ ] **T-003C3 — Serialização segura e CLI decimal**
+  - **Atende:** RN-010, seção 4.2, D-004 e critérios operacionais de saída.
+  - **Faz:** serializa `DecimalInterno` somente na fronteira; impede `BigInt`/`DecimalInterno` em `JSON.stringify`; verifica round-trip de centavos; adapta CLI e erros de serialização; valida a saída completa do exemplo.
+  - **Depende de:** T-003A, T-003B, T-003C2, T-014A e T-014B.
+  - **Aceite:** campos monetários continuam `number` JSON; valores finais são arredondados conforme RN-010; conversão que perderia centavos falha controladamente; CLI escreve saída válida e não deixa arquivo enganoso em erro; `processado_em` e schema permanecem válidos; o exemplo mantém `1765.94 / 790.43 / 975.51`.
+  - **Testes:** `tests/rules/serializacao-monetaria.test.js`, `tests/integracao/cli-sucesso.test.js`, `tests/integracao/cli-erros.test.js` e `tests/integracao/totais-exemplo.test.js`.
+  - **Commit:** `feat(T-003C3): fecha serialização monetária e CLI decimal`
 
 ## Fase 2 — Fases preliminares
 
@@ -132,7 +148,7 @@
 - [ ] **T-011B — Distribuição proporcional e resíduos**
   - **Atende:** RN-001/RN-002/RN-003/RN-010, A4/D-003 e D-004.
   - **Faz:** calcula proporções com quociente e resto inteiros, trunca inicialmente, distribui centavos pelos maiores restos comparados por multiplicação cruzada e desempata pela posição original.
-  - **Depende de:** T-003A, T-003B, T-003C e T-011A.
+  - **Depende de:** T-003A, T-003B, T-003C3 e T-011A.
   - **Aceite:** soma de grupo limitado é exatamente o limite; casos com resíduos e empate matemático são determinísticos; teste diferencia arredondamento de apresentação de corte real por limite, mantendo d-011 como `aprovado` e d-003 como `aprovado` após estorno quando seu valor efetivo permanece integralmente dentro do limite.
   - **Testes:** `tests/rules/distribuicao-residuos.test.js`, incluindo proporções, empate exato de restos e fechamento em centavos.
   - **Commit:** `feat(T-011B): fecha limites com restos decimais exatos`
@@ -155,7 +171,7 @@
 
 - [ ] **T-013 — Resumo e totais**
   - **Atende:** seção 4.2, RN-010, RN-011 e D-004.
-  - **Depende de:** T-003A, T-003B, T-003C, T-012.
+  - **Depende de:** T-003A, T-003B, T-003C2, T-003C3, T-012.
   - **Aceite:** ignora itens `ignorado`; inclui recusados e zero no conjunto lógico; preserva precisão de originais; determina status antes do arredondamento; d-011 permanece `aprovado` e d-003 permanece `aprovado` após compensação quando seu valor efetivo está dentro do limite; recompõe os totais com decimal exato e satisfaz a invariante dos totais.
   - **Testes:** `tests/rules/resumo.test.js`, incluindo lista vazia, zero, ignorados e recomposição independente.
   - **Commit:** `feat(T-013): calcula totais com decimal exato`
@@ -178,14 +194,14 @@
 
 - [ ] **T-015A — Integração do arquivo de exemplo**
   - **Atende:** seção 9; D-003 A1–A9 e D-004, incluindo confirmação numérica dos totais.
-  - **Depende de:** T-003A, T-003B, T-003C, T-012, T-013, T-014A.
+  - **Depende de:** T-003A, T-003B, T-003C3, T-012, T-013, T-014A.
   - **Aceite:** verifica cada item, incluindo d-011 com `valor_original = 33,333`, `valor_reembolsavel = 33,33` e `status = aprovado`, d-003 como `aprovado` após estorno, d-004/d-009, d-010 e seus campos de auditoria, aliases, resíduos, d-007/d-008/d-009 ignorados com motivos definidos nas regras aplicáveis, schema de saída e lista de despesas vazia; usa os totais confirmados após a migração decimal e valida a serialização segura.
   - **Testes:** `tests/integracao/despesas-exemplo.test.js` e caso de entrada vazia, incluindo todos os itens e motivos ignorados.
   - **Commit:** `test(T-015A): valida integração após migração decimal`
 
 - [ ] **T-015B — Recálculo e confirmação dos totais de integração**
   - **Atende:** seção 9, invariante dos totais e D-004.
-  - **Depende de:** T-003A, T-003B, T-003C, T-015A.
+  - **Depende de:** T-003A, T-003B, T-003C3, T-015A.
   - **Aceite:** recalcula e confirma a partir da saída real `total_solicitado = R$ 1.765,94`, `total_reembolsavel = R$ 790,43` e `total_recusado = R$ 975,51`; recompõe cada total independentemente dos itens com decimal exato, verifica `total_solicitado = total_reembolsavel + total_recusado` e registra a correção do provisório de R$ 791,43 causada pelo limite de R$ 60,00 aplicado a d-014 após a migração decimal.
   - **Testes:** `tests/integracao/totais-exemplo.test.js`, incluindo recomposição independente, d-014 e round-trip dos centavos.
   - **Commit:** `test(T-015B): confirma totais após migração decimal`
@@ -233,6 +249,6 @@
 
 ## Ordem sugerida de implementação
 
-T-001 → T-002 → T-003A → T-003B → T-003C → T-004 → T-005 → T-006 → T-017 → T-007A → T-008 → T-009 → T-010 → T-007B → T-011A → T-011B → T-011C → T-012 → T-013 → T-014A → T-014B → T-015A → T-015B → T-016 → T-018 → T-019.
+T-001 → T-002 → T-003A → T-003B → T-003C1 → T-003C2 → T-003C3 → T-004 → T-005 → T-006 → T-017 → T-007A → T-008 → T-009 → T-010 → T-007B → T-011A → T-011B → T-011C → T-012 → T-013 → T-014A → T-014B → T-015A → T-015B → T-016 → T-018 → T-019.
 
-T-003A, T-003B e T-003C devem passar antes de T-011B, T-013, T-015A e T-015B. Nenhuma dessas tasks pode ser marcada como concluída antes dos testes de decimal exato, parser lexical, serialização segura, distribuição por quociente/resto, recomposição dos totais e integração do exemplo passarem.
+T-003C1 mantém compatibilidade com o loader/engine antigos. T-003C2 migra loader e engine de modo atômico. T-003C3 fecha a fronteira de serialização e CLI. T-003C1, T-003C2 e T-003C3 devem passar antes de T-011B, T-013, T-015A e T-015B; nenhuma dessas tasks pode ser marcada como concluída antes dos testes de adapter, migração decimal, serialização segura, distribuição por quociente/resto, recomposição dos totais e integração do exemplo passarem.

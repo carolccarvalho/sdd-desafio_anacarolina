@@ -65,6 +65,12 @@ conhece a ordem; cada regra não conhece a implementação das demais.
 escreve arquivos. `resumo.js` opera apenas sobre o estado final produzido pelo
 engine.
 
+A T-003C1 mantém compatibilidade entre o loader e o engine legados: o adapter
+lexical é isolado e não substitui o fluxo ativo. A T-003C2 ativa o loader
+decimal e migra loader e engine de modo atômico, sem commit intermediário com
+contrato incompatível entre ambos. A T-003C3 fecha a fronteira de serialização
+e CLI, impedindo que `DecimalInterno` ou `BigInt` cheguem ao JSON final.
+
 ---
 
 ## 3. Precisão e representação monetária
@@ -202,6 +208,11 @@ CATEGORIAS_PERMITIDAS = ["alimentacao", "transporte_urbano", "hospedagem"]
 ALIASES_CATEGORIA = { "alimentação": "alimentacao" }
 LIMITE_NOTA_FISCAL = 100.00
 ```
+
+Os limites monetários da política devem ser definidos como lexemas decimais ou
+convertidos em uma única fronteira controlada para `DecimalInterno`. Nenhum
+cálculo monetário pode usar `Number`; `Number` fica restrito a escala, posição
+de array e metadados não monetários.
 
 A comparação de fornecedor para agrupamento usa uma forma técnica
 case-insensitive. A normalização de categoria utiliza a tabela explícita de
