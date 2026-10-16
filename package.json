@@ -1,0 +1,4 @@
+{
+  "type": "module",
+  "scripts": {"start":"node src/cli.js","test":"node --test"}
+}
