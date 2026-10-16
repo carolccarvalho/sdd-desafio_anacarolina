@@ -65,63 +65,25 @@ conhece a ordem; cada regra não conhece a implementação das demais.
 escreve arquivos. `resumo.js` opera apenas sobre o estado final produzido pelo
 engine.
 
-A T-003C1 mantém compatibilidade entre o loader e o engine legados: o adapter
-lexical é isolado e não substitui o fluxo ativo. A T-003C2 ativa o loader
-decimal e migra loader e engine de modo atômico, sem commit intermediário com
-contrato incompatível entre ambos. A T-003C3 fecha a fronteira de serialização
-e CLI, impedindo que `DecimalInterno` ou `BigInt` cheguem ao JSON final.
+A implementação monetária usa `decimal.js` como dependência única para aritmética decimal. O loader continua usando `JSON.parse`, converte valores monetários com `Decimal(String(valor))` e o engine converte para `Number` somente depois do arredondamento final de saída. Não há parser JSON lexical, `BigInt` ou escala manual.
 
 ---
 
 ## 3. Precisão e representação monetária
 
-Valores monetários internos usam o tipo decimal exato `{ units: BigInt, scale: integer }`.
-O valor matemático é `units / 10^scale`; o sinal pertence a `units` e `scale` é
-inteiro não negativo. Zeros finais podem ser normalizados: `100`, `100.0` e
-`100.00` representam o mesmo valor financeiro. Nenhuma operação monetária
-interna usa `Number`, e nenhum `BigInt` é convertido para `Number` antes da
-fronteira de serialização.
+Valores monetários internos usam instâncias de `Decimal` da versão fixa `10.6.0` de `decimal.js`. A entrada continua sendo lida com `JSON.parse`; cada valor monetário é convertido imediatamente com `Decimal(String(valor))`. A biblioteca é usada para soma, subtração, comparação, proporção, estornos, limites e totais.
 
-Exemplos da representação:
+A configuração de arredondamento usa `Decimal.ROUND_HALF_UP`. Assim, `1.005`
+produz `1.01`, `2.675` produz `2.68` e `0.1 + 0.2` produz `0.3` sem depender
+da aritmética binária de `Number`.
 
-```text
-0.1     → { units: 1n,     scale: 1 }
-1.005   → { units: 1005n,  scale: 3 }
-33.333  → { units: 33333n, scale: 3 }
--45.123 → { units: -45123n, scale: 3 }
-```
+A simplificação não preserva o lexema bruto de números JSON arbitrariamente
+longos após `JSON.parse`. Ela é adotada para o domínio e os valores monetários
+previstos neste projeto; não há parser JSON lexical, `BigInt` ou escala manual.
 
-`Number` não é usado porque sua representação binária não garante soma decimal
-exata nem half-up decimal em fronteiras como `1.005 → 1.01` e `2.675 → 2.68`.
-A entrada é lida lexicalmente antes da conversão monetária: `JSON.parse` não
-pode converter valores monetários antes da criação do decimal interno, pois
-perderia precisão decimal. O parser deve aceitar números JSON válidos em
-notação científica e convertê-los exatamente (`1e-3 → 0,001`). A escala
-lexical original não precisa ser preservada; somente o valor decimal matemático
-exato deve ser preservado. Não se introduz limite funcional novo de magnitude,
-casas ou expoente.
-
-O parser lexical preserva o lexema numérico, separa sinal, mantissa e expoente,
-remove o ponto decimal e ajusta `scale = casas_da_mantissa - expoente`. Campos
-não monetários continuam sujeitos à validação estrutural existente. O parser
-deve rejeitar apenas JSON malformado ou número lexical inválido segundo o
-contrato JSON, sem criar regra de negócio adicional.
-
-Soma, subtração e comparação alinham as escalas multiplicando `units` por
-potências de dez. Multiplicação por inteiro mantém a escala; multiplicação entre
-decimais soma as escalas. Estornos, limites, totais e comparações usam somente
-essas operações exatas.
-
-Para grupos limitados, a divisão proporcional usa quociente e resto inteiros.
-Para cada item, calcula-se `numerator = units_do_item × target_centavos` e
-`denominator = units_do_total`; o quociente é o número de centavos truncado e o
-resto é mantido como fração racional. Restos `r1/d1` e `r2/d2` são comparados
-por multiplicação cruzada (`r1 × d2` versus `r2 × d1`). Restos matematicamente
-iguais são desempatados pela posição original no array.
-
-Half-up em duas casas calcula quociente e resto de `units × 100 / 10^scale` e
-arredonda para cima quando `2 × resto >= 10^scale`. Assim, `1.005` produz
-`1.01` e `2.675` produz `2.68` sem usar ponto flutuante.
+Para grupos limitados, a divisão proporcional usa `Decimal` para calcular as
+parcelas e os resíduos. Os resíduos são comparados com `Decimal.comparedTo`; em
+empate matemático, a posição original no array resolve deterministicamente.
 
 O arredondamento ocorre somente:
 
@@ -134,21 +96,19 @@ cada item antes da soma. O resultado final é arredondado para duas casas.
 
 ### Serialização segura
 
-Após o arredondamento final, valores com duas casas são convertidos para
-`Number` somente na fronteira de saída, porque o schema atual exige JSON
-numérico. A conversão parte de centavos inteiros e deve verificar que o valor
-convertido, quando reconvertido para centavos, preserva exatamente os mesmos
-centavos; caso contrário, a serialização deve falhar em vez de perder centavos
-silenciosamente. `BigInt` nunca é entregue diretamente a `JSON.stringify`.
+Após o arredondamento final com `Decimal.toDecimalPlaces(2, Decimal.ROUND_HALF_UP)`,
+os campos monetários são convertidos para `Number` na fronteira de saída. Apenas
+números JavaScript chegam a `JSON.stringify`; instâncias de `Decimal` nunca são
+serializadas diretamente.
 
 ### Fechamento de grupos limitados
 
 Para cada grupo cujo total exceda o limite:
 
-1. calcular o valor proporcional exato de cada item com quociente e resto inteiros;
-2. converter cada valor para centavos por truncamento para baixo;
+1. calcular a parcela proporcional de cada item com `Decimal`;
+2. truncar cada parcela para centavos;
 3. calcular quantos centavos faltam para alcançar exatamente o limite;
-4. ordenar itens pelo maior resto comparado exatamente;
+4. ordenar itens pelo maior resíduo usando `Decimal.comparedTo`;
 5. em empate matemático, ordenar pela posição original no array de entrada;
 6. adicionar um centavo aos primeiros itens necessários.
 
