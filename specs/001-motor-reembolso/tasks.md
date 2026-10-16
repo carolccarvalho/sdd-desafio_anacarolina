@@ -22,10 +22,10 @@
   - **Commit:** `feat(T-002): valida entrada e competência informativa`
 
 - [ ] **T-003 — Representação monetária e arredondamento final**
-  - **Atende:** RN-010, AMB-009, A4/D-003.
+  - **Atende:** RN-010, AMB-009, A4/D-003 e D-004.
   - **Faz:** preserva `valor_original`; fornece operações decimais exatas e arredondamento half-up na saída.
   - **Depende de:** T-001.
-  - **Aceite:** `33.333` permanece exato internamente e sai como `33.33`; soma de originais é arredondada somente no total; conversões não perdem escala.
+  - **Aceite:** `33.333` permanece exato internamente e sai como `33.33`; d-011 tem `status = aprovado` porque seu valor reembolsável interno corresponde integralmente ao valor efetivo elegível antes do arredondamento; o status é decidido antes do arredondamento de output; soma de originais é arredondada somente no total; conversões não perdem escala.
   - **Testes:** `tests/rules/RN-010-arredondamento.test.js`.
   - **Commit:** `feat(T-003): preserva precisão e arredonda valores finais`
 
@@ -114,10 +114,10 @@
   - **Commit:** `feat(T-011A): calcula limites diários e grupos de hospedagem`
 
 - [ ] **T-011B — Distribuição proporcional e resíduos**
-  - **Atende:** RN-001/RN-002/RN-003/RN-010, A4/D-003.
+  - **Atende:** RN-001/RN-002/RN-003/RN-010, A4/D-003 e D-004.
   - **Faz:** calcula proporções, trunca inicialmente, distribui centavos pelos maiores restos e desempata pela posição original.
   - **Depende de:** T-003, T-011A.
-  - **Aceite:** soma de grupo limitado é exatamente o limite; casos com resíduos e empate são determinísticos.
+  - **Aceite:** soma de grupo limitado é exatamente o limite; casos com resíduos e empate são determinísticos; teste diferencia arredondamento de apresentação de corte real por limite, mantendo d-011 como `aprovado` e d-003 como `aprovado` após estorno quando seu valor efetivo permanece integralmente dentro do limite.
   - **Testes:** `tests/rules/distribuicao-residuos.test.js`.
   - **Commit:** `feat(T-011B): fecha limites com distribuição de resíduos`
 
@@ -138,9 +138,9 @@
   - **Commit:** `feat(T-012): orquestra pipeline de onze etapas`
 
 - [ ] **T-013 — Resumo e totais**
-  - **Atende:** seção 4.2, RN-010, RN-011.
+  - **Atende:** seção 4.2, RN-010, RN-011 e D-004.
   - **Depende de:** T-003, T-012.
-  - **Aceite:** ignora itens `ignorado`; inclui recusados e zero no conjunto lógico; preserva precisão de originais; satisfaz invariante dos totais.
+  - **Aceite:** ignora itens `ignorado`; inclui recusados e zero no conjunto lógico; preserva precisão de originais; determina status antes do arredondamento; d-011 permanece `aprovado` e d-003 permanece `aprovado` após compensação quando seu valor efetivo está dentro do limite; satisfaz invariante dos totais.
   - **Testes:** `tests/rules/resumo.test.js`, incluindo lista vazia.
   - **Commit:** `feat(T-013): calcula resumo e invariante financeira`
 
@@ -161,16 +161,16 @@
   - **Commit:** `feat(T-014B): trata erros de argumentos e entrada na CLI`
 
 - [ ] **T-015A — Integração do arquivo de exemplo**
-  - **Atende:** seção 9; D-003 A1–A9, exceto confirmação numérica dos totais.
+  - **Atende:** seção 9; D-003 A1–A9 e D-004, incluindo confirmação numérica dos totais.
   - **Depende de:** T-012, T-013, T-014A.
-  - **Aceite:** verifica cada item, d-003/d-004/d-009, d-010 e seus campos de auditoria, aliases, resíduos, itens ignorados, schema de saída e lista de despesas vazia; não fixa totais ainda não recalculados.
+  - **Aceite:** verifica cada item, incluindo d-011 com `valor_original = 33,333`, `valor_reembolsavel = 33,33` e `status = aprovado`, d-003 como `aprovado` após estorno, d-004/d-009, d-010 e seus campos de auditoria, aliases, resíduos, d-007/d-008/d-009 ignorados com motivos definidos nas regras aplicáveis, schema de saída e lista de despesas vazia; usa os totais confirmados.
   - **Testes:** `tests/integracao/despesas-exemplo.test.js` e caso de entrada vazia.
   - **Commit:** `test(T-015A): valida integração do arquivo de exemplo`
 
 - [ ] **T-015B — Recálculo e confirmação dos totais de integração**
-  - **Atende:** seção 9, invariante dos totais e D-003 A4/A6.
+  - **Atende:** seção 9, invariante dos totais e D-004.
   - **Depende de:** T-015A.
-  - **Aceite:** recalcula `total_solicitado`, `total_reembolsavel` e `total_recusado` a partir da saída real; confirma ou registra a atualização dos valores esperados e verifica `total_solicitado = total_reembolsavel + total_recusado`.
+  - **Aceite:** recalcula e confirma a partir da saída real `total_solicitado = R$ 1.765,94`, `total_reembolsavel = R$ 790,43` e `total_recusado = R$ 975,51`; verifica `total_solicitado = total_reembolsavel + total_recusado` e registra a correção do provisório de R$ 791,43 causada pelo limite de R$ 60,00 aplicado a d-014.
   - **Testes:** `tests/integracao/totais-exemplo.test.js`.
   - **Commit:** `test(T-015B): confirma totais de integração`
 

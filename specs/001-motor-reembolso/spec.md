@@ -1,6 +1,6 @@
 # Spec — Motor de Cálculo de Reembolso
 
-**Versão:** 1.3 · **Status:** ativo · **Última alteração:** 2026-10-16
+**Versão:** 1.4 · **Status:** ativo · **Última alteração:** 2026-10-16
 
 > **Regra de ouro deste arquivo:** ele descreve o QUÊ e o PORQUÊ. Nenhuma linha
 > aqui pode citar linguagem, biblioteca, classe, função ou estrutura de pasta.
@@ -97,10 +97,12 @@ Conforme `exemplos/despesas-exemplo.json`.
 | `itens[].limite_grupo` | number BRL | Limite agregado da data e categoria, com duas casas decimais | Condicional |
 
 **Status possíveis:**
-- `aprovado` — reembolso integral do valor solicitado.
-- `aprovado_parcial` — reembolso até o limite máximo; o excedente não é pago.
+- `aprovado` — o valor reembolsável interno corresponde integralmente ao valor efetivo elegível do item, após as compensações aplicáveis e antes do arredondamento final de apresentação.
+- `aprovado_parcial` — a aplicação de limite diário ou outra regra que reduza o valor reembolsável interno abaixo do valor efetivo elegível determina este status.
 - `recusado` — valor reembolsável é zero; motivo obrigatório. O `valor_original` entra no `total_solicitado` e no `total_recusado`.
 - `ignorado` — despesa não entra no cálculo. Aparece na lista para auditoria, mas não afeta nenhum total do resumo. Subcasos (distinguíveis pelo `motivo`): estorno processado, estorno sem correspondente, fora do período de competência e duplicata secundária.
+
+O status é determinado antes do arredondamento final do output, usando os valores efetivos e limites com a precisão interna disponível. O arredondamento de apresentação não transforma uma aprovação integral em aprovação parcial e uma diferença causada somente por arredondamento não representa recusa por política de reembolso.
 
 **Por que itens `recusado` entram no `total_solicitado`:**
 O colaborador solicitou o reembolso; o sistema negou. O `total_recusado` é a diferença entre o que foi pedido e o que será pago — inclui **tanto** o excedente de itens `aprovado_parcial` **quanto** o valor inteiro de itens `recusado`. Isso é intencional: `total_recusado` não representa apenas itens integralmente negados, mas todo o valor solicitado que não será pago. A invariante `total_solicitado = total_reembolsavel + total_recusado` deve ser satisfeita em qualquer saída válida.
@@ -306,18 +308,23 @@ no array é aplicado; o segundo é descartado como duplicata.
 ### RN-010 — Arredondamento monetário
 
 **Regra:** Todos os valores reembolsáveis no output são arredondados para duas
-casas decimais usando half-up (0,005 arredonda para 0,01). Cálculos internos
-(proporções, limites) usam precisão máxima disponível. Quando um grupo excede seu
-limite, os valores exatos são arredondados inicialmente para baixo e os centavos
-restantes são atribuídos aos itens com maiores restos fracionários; empates são
-resolvidos pela posição no array de entrada. A soma final dos itens é exatamente
-o limite do grupo. Para `total_solicitado`: os `valor_original` são somados em
-sua precisão exata e o resultado final é arredondado para duas casas decimais.
-Não se arredonda cada `valor_original` individualmente antes de somar.
+casas decimais usando half-up (0,005 arredonda para 0,01). O status é decidido
+antes desse arredondamento, usando os valores efetivos e limites com a precisão
+interna disponível. Portanto, o arredondamento de apresentação não transforma
+uma aprovação integral em aprovação parcial, e uma diferença causada somente
+por arredondamento não representa recusa por política de reembolso. Cálculos
+internos (proporções, limites) usam precisão máxima disponível. Quando um grupo
+excede seu limite, os valores exatos são arredondados inicialmente para baixo e
+os centavos restantes são atribuídos aos itens com maiores restos fracionários;
+empates são resolvidos pela posição no array de entrada. A soma final dos itens
+é exatamente o limite do grupo. Para `total_solicitado`: os `valor_original`
+são somados em sua precisão exata e o resultado final é arredondado para duas
+casas decimais. Não se arredonda cada `valor_original` individualmente antes de
+somar.
 
 **Origem:** identificado na análise do arquivo de exemplo (d-011, valor R$ 33,333).
 
-**Aceite:** d-011 (R$ 33,333, `alimentacao`, abaixo do limite) → `valor_reembolsavel` = R$ 33,33.
+**Aceite:** d-011 (R$ 33,333, `alimentacao`, abaixo do limite) → `status = aprovado` e `valor_reembolsavel` = R$ 33,33. A diferença entre o valor original e o valor exibido decorre somente do arredondamento de output e não representa recusa por política.
 
 ---
 
@@ -585,7 +592,7 @@ O excedente é descartado para manter o sistema simples e auditável.
 | Estorno compensa total agregado do grupo | d-009 (−R$ 45,00, `transporte_urbano`, `TaxiApp`) | Ignora o estorno; reduz valor_original agregado do grupo em R$ 45,00 | RN-008, AMB-008 |
 | Hospedagem: num_diarias inferido da descrição | d-010 "Hotel Rio - 2 diárias" | num_diarias = 2; limite = R$ 500,00 | RN-003, AMB-003 |
 | Hospedagem: descrição sem número de diárias | despesa de hospedagem sem padrão na descrição | Recusada: não foi possível determinar o número de diárias | RN-003, AMB-003 |
-| Valor com três casas decimais | d-011 (R$ 33,333) | `valor_reembolsavel` = R$ 33,33 (arredondamento) | RN-010, AMB-009 |
+| Valor com três casas decimais | d-011 (R$ 33,333) | `status = aprovado`; `valor_reembolsavel` = R$ 33,33 por arredondamento de output, pois o valor efetivo está abaixo do limite | RN-010, AMB-009 |
 | Hospedagem sem nota fiscal acima de R$ 100 | d-013 (R$ 690,00, sem nota) | Recusada: nota fiscal obrigatória | RN-005 |
 | Categoria em maiúsculas | d-014 (`ALIMENTACAO`) | Normalizada e tratada como `alimentacao` | RN-006, AMB-007 |
 | Lista de despesas vazia | `"despesas": []` | Saída válida com totais zero e lista de itens vazia | — |
@@ -633,7 +640,7 @@ O sistema está pronto quando:
 - [ ] d-008 ser `ignorado` (fora do período de competência).
 - [ ] d-009 (estorno −R$ 45,00) ser associado ao grupo candidato, ser `ignorado` e reduzir sequencialmente apenas a despesa elegível d-003 em R$ 45,00; d-004 deve ser excluída antes da aplicação por nota fiscal baseada no valor original.
 - [ ] d-010 ("Hotel Rio - 2 diárias") ter `num_diarias` = 2, `limite_unitario_diaria` = R$ 250,00, `limite_item` = R$ 500,00, `limite_grupo` = R$ 500,00 e `valor_reembolsavel` = R$ 480,00.
-- [ ] d-011 ter `valor_reembolsavel` de R$ 33,33.
+- [ ] d-011 ter `valor_original` = R$ 33,333, `valor_reembolsavel` = R$ 33,33 e `status = aprovado`; a diferença decorre somente do arredondamento de output e não representa recusa por política.
 - [ ] d-013 ser `recusado` por falta de nota fiscal.
 - [ ] d-014 (`ALIMENTACAO`) ser tratada como `alimentacao`; a forma acentuada `alimentação` também deve produzir o canônico `alimentacao`.
 - [ ] `resumo.total_reembolsavel` = soma dos `valor_reembolsavel` de itens `aprovado` ou `aprovado_parcial`.
@@ -644,7 +651,7 @@ O sistema está pronto quando:
 - [ ] Despesas fora do período serem ignoradas antes da validação de valor zero.
 - [ ] Hospedagens elegíveis da mesma data emitirem o mesmo `limite_grupo`; os quatro campos de auditoria serem omitidos para outras categorias e inferências malsucedidas.
 - [ ] `periodo.competencia` aceitar somente o formato `AAAA-MM` e não decidir a inclusão da despesa.
-- [ ] **Critério de integração pendente de validação:** após a implementação das regras v1.3, recalcular `exemplos/despesas-exemplo.json` e confirmar ou atualizar `resumo.total_solicitado`, `resumo.total_reembolsavel` e `resumo.total_recusado`, os itens `ignorado` e a invariante `total_solicitado = total_reembolsavel + total_recusado`.
+- [ ] **Critério de integração confirmado:** para `exemplos/despesas-exemplo.json`, `resumo.total_solicitado` = R$ 1.765,94, `resumo.total_reembolsavel` = R$ 790,43 e `resumo.total_recusado` = R$ 975,51; d-007 deve ser `ignorado` com motivo "Duplicata da despesa d-006", d-008 deve ser `ignorado` com o motivo de RN-007 para data fora do período de competência e d-009 deve ser `ignorado` com o motivo de RN-008 "Estorno: compensou despesas de transporte_urbano do fornecedor TaxiApp no período"; a invariante `total_solicitado = total_reembolsavel + total_recusado` também deve ser verificada.
 
 ---
 

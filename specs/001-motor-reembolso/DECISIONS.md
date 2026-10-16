@@ -10,6 +10,26 @@ Ordem cronológica inversa: a mais recente primeiro.
 
 ---
 
+## D-004 — Status antes do arredondamento e confirmação dos totais · 2026-10-16
+
+**Gatilho:** auditoria numérica da integração da versão 1.3 e revisão do caso d-011.
+
+### Status determinado antes do arredondamento
+- **Decisão:** o status é determinado antes do arredondamento final do output: `aprovado` quando o valor reembolsável interno corresponde integralmente ao valor efetivo elegível após compensações aplicáveis; `aprovado_parcial` somente quando limite diário ou outra regra reduz esse valor interno abaixo do valor efetivo elegível. Um estorno aplicado antes dos limites redefine o valor efetivo, mas não torna o item `aprovado_parcial` quando esse valor permanece integralmente dentro do limite. O arredondamento de apresentação, isoladamente, não altera o status.
+- **Aplicação:** d-011, com `valor_original` de R$ 33,333 abaixo do limite de R$ 60,00, é `aprovado` e emite `valor_reembolsavel` de R$ 33,33.
+- **Regras afetadas:** RN-010 e definições de status.
+- **Tasks impactadas:** T-003, T-011B, T-013, T-015A e T-015B.
+- **Testes:** d-011 com status aprovado; distinção entre arredondamento de apresentação e corte real por limite.
+
+### Totais de integração confirmados
+- **Decisão:** os totais de `exemplos/despesas-exemplo.json` são `total_solicitado` = R$ 1.765,94, `total_reembolsavel` = R$ 790,43 e `total_recusado` = R$ 975,51.
+- **Correção:** o valor provisório de R$ 791,43 foi corrigido porque d-014, categoria `ALIMENTACAO`, deve ser normalizada para `alimentacao` e limitada a R$ 60,00; o R$ 1,00 excedente não é reembolsável.
+- **Invariante:** R$ 1.765,94 = R$ 790,43 + R$ 975,51.
+- **Tasks impactadas:** T-015A e T-015B.
+- **Testes:** integração item a item, totais confirmados e invariante financeira.
+
+---
+
 ## D-003 — Atualização da spec v1.2 para v1.3 · 2026-10-16
 
 **Gatilho:** resolução das inconsistências identificadas na auditoria documental da versão 1.2.
