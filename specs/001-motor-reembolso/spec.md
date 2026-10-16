@@ -1,6 +1,6 @@
 # Spec — Motor de Cálculo de Reembolso
 
-**Versão:** 1.2 · **Status:** ativo · **Última alteração:** 2026-10-02
+**Versão:** 1.3 · **Status:** ativo · **Última alteração:** 2026-10-16
 
 > **Regra de ouro deste arquivo:** ele descreve o QUÊ e o PORQUÊ. Nenhuma linha
 > aqui pode citar linguagem, biblioteca, classe, função ou estrutura de pasta.
@@ -49,7 +49,7 @@ Conforme `exemplos/despesas-exemplo.json`.
 | `colaborador.id` | string | Identificador único do colaborador | Sim |
 | `colaborador.nome` | string | Nome do colaborador | Sim |
 | `colaborador.centro_custo` | string | Centro de custo | Sim |
-| `periodo.competencia` | string `AAAA-MM` | Mês de competência | Sim |
+| `periodo.competencia` | string `AAAA-MM` | Metadado informativo da competência | Sim |
 | `periodo.inicio` | string `AAAA-MM-DD` | Primeiro dia do período | Sim |
 | `periodo.fim` | string `AAAA-MM-DD` | Último dia do período | Sim |
 | `despesas[].id` | string | Identificador único da despesa | Sim |
@@ -61,11 +61,13 @@ Conforme `exemplos/despesas-exemplo.json`.
 | `despesas[].tem_nota_fiscal` | boolean | Se há nota fiscal vinculada | Sim |
 
 > **Nota sobre hospedagem e número de diárias:** a política define o limite em
-> "R$ 250 por diária". O campo `num_diarias` não existe na entrada. O sistema
-> deve ser capaz de determinar o número de diárias a partir das informações
-> disponíveis no campo `descricao`. Se não for possível determiná-lo, a despesa
-> é recusada com motivo "Não foi possível determinar o número de diárias a partir
-> da descrição". O mecanismo de extração está descrito em `plan.md`.
+> "R$ 250 por diária". O campo `num_diarias` não existe na entrada. Para uma
+> hospedagem ser elegível, a `descricao` deve conter exatamente um número inteiro
+> positivo em algarismos imediatamente antes de `diária`, `diárias`, `noite` ou
+> `noites`, sem distinção de maiúsculas/minúsculas. Número depois da expressão,
+> número por extenso ou mais de um número candidato tornam a descrição inválida.
+> Se não for possível determinar as diárias, a despesa é recusada com motivo
+> "Não foi possível determinar o número de diárias a partir da descrição".
 > (ver AMB-003)
 
 > **Sugestão para versão futura:** adicionar campo `num_diarias` explícito na
@@ -89,6 +91,10 @@ Conforme `exemplos/despesas-exemplo.json`.
 | `itens[].valor_reembolsavel` | number | Valor aprovado (0 se recusado ou ignorado) |
 | `itens[].status` | string | `"aprovado"`, `"aprovado_parcial"`, `"recusado"` ou `"ignorado"` |
 | `itens[].motivo` | string | Justificativa legível da decisão |
+| `itens[].num_diarias` | integer positivo | Quantidade de diárias determinada para hospedagem | Condicional |
+| `itens[].limite_unitario_diaria` | number BRL | Limite de uma diária, com duas casas decimais | Condicional |
+| `itens[].limite_item` | number BRL | Limite individual do item, com duas casas decimais | Condicional |
+| `itens[].limite_grupo` | number BRL | Limite agregado da data e categoria, com duas casas decimais | Condicional |
 
 **Status possíveis:**
 - `aprovado` — reembolso integral do valor solicitado.
@@ -144,25 +150,28 @@ Itens `ignorado` não entram em nenhum total do resumo. Esse status cobre três 
 ### RN-001 — Limite diário de alimentação
 
 **Regra:** O total reembolsável de despesas de `alimentacao` por dia de calendário
-é de R$ 60,00. Apenas despesas que chegaram à etapa de limites (não recusadas,
-não ignoradas) são somadas no total diário. Se a soma ultrapassar R$ 60,00, o
-reembolso de cada item é calculado proporcionalmente: `valor_item / total_dia × limite_dia`.
-O resultado de cada item é arredondado para duas casas decimais (half-up).
+é de R$ 60,00. Apenas despesas elegíveis na etapa de limites são somadas no total
+diário. Se a soma ultrapassar R$ 60,00, o reembolso de cada item é calculado
+proporcionalmente. Os valores são arredondados por maiores restos fracionários:
+após arredondar para baixo, os centavos restantes são atribuídos aos maiores
+restos; empates são resolvidos pela posição no array de entrada. A soma final é
+exatamente R$ 60,00.
 
 **Origem:** política do RH, item 1.
 
 **Aceite:** d-001 (R$ 72,50) + d-002 (R$ 38,00) no dia 2026-07-03 → total = R$ 110,50 > R$ 60,00.
 d-001 reembolsável = 72,50 / 110,50 × 60,00 = R$ 39,37.
 d-002 reembolsável = 38,00 / 110,50 × 60,00 = R$ 20,63.
-Soma dos reembolsáveis = R$ 60,00 (pode variar em ±R$ 0,01 por arredondamento).
+Soma dos reembolsáveis = R$ 60,00 exatamente; eventual resíduo de centavos é distribuído conforme RN-010.
 
 ---
 
 ### RN-002 — Limite diário de transporte urbano
 
 **Regra:** O total reembolsável de despesas de `transporte_urbano` por dia de
-calendário é de R$ 80,00. Apenas despesas não recusadas e não ignoradas entram
-no total diário. Mesma lógica de agregação e distribuição proporcional de RN-001.
+calendário é de R$ 80,00. Apenas despesas elegíveis na etapa de limites entram
+no total diário. Aplica-se a mesma distribuição proporcional e determinística
+de RN-001, com soma final exatamente igual ao limite quando o grupo for limitado.
 
 **Origem:** política do RH, item 2.
 
@@ -175,11 +184,14 @@ no total diário. Mesma lógica de agregação e distribuição proporcional de 
 ### RN-003 — Limite diário de hospedagem
 
 **Regra:** O total reembolsável de despesas de `hospedagem` por dia de calendário
-é calculado com base no número de diárias inferido da `descricao` (ver AMB-003).
-O limite máximo do dia é `num_diarias × R$ 250,00`.
-Múltiplas despesas de hospedagem no mesmo dia somam para esse limite diário,
-com distribuição proporcional igual à de RN-001.
-Apenas despesas não recusadas e não ignoradas entram no total diário.
+é calculado com base no número de diárias determinado para cada item (ver AMB-003).
+O limite individual do item é `num_diarias × R$ 250,00`. O limite do grupo na
+mesma data é a soma dos limites individuais dos itens elegíveis. Múltiplas
+despesas de hospedagem no mesmo dia compartilham esse limite agregado, com
+distribuição proporcional e determinística igual à de RN-001. A soma final é
+exatamente igual ao limite do grupo quando ele for excedido. Cada item elegível
+emite `num_diarias`, `limite_unitario_diaria`, `limite_item` e `limite_grupo`;
+esses campos são omitidos para outras categorias ou quando a inferência falhar.
 
 **Origem:** política do RH, item 3.
 
@@ -202,9 +214,10 @@ valor do limite (status `aprovado_parcial`). O item não é recusado integralmen
 
 ### RN-005 — Nota fiscal obrigatória para valores acima de R$ 100,00
 
-**Regra:** Despesas com `valor` estritamente maior que R$ 100,00 **e**
+**Regra:** Despesas com `valor_original` estritamente maior que R$ 100,00 **e**
 `tem_nota_fiscal = false` são recusadas integralmente com motivo
-"Nota fiscal obrigatória para valores acima de R$ 100,00".
+"Nota fiscal obrigatória para valores acima de R$ 100,00". A comparação sempre
+usa o valor original da entrada, antes de qualquer compensação de estorno.
 Despesas com `valor` exatamente igual a R$ 100,00 e `tem_nota_fiscal = false`
 **não** são recusadas por esta regra.
 
@@ -218,8 +231,10 @@ d-013 (R$ 690,00, sem nota) → recusada: nota fiscal obrigatória.
 
 ### RN-006 — Categorias permitidas
 
-**Regra:** Somente as categorias `alimentacao`, `transporte_urbano` e `hospedagem`
-são reembolsáveis. A comparação é insensível a maiúsculas/minúsculas (ver AMB-007).
+**Regra:** Somente as categorias canônicas `alimentacao`, `transporte_urbano` e
+`hospedagem` são reembolsáveis. A comparação é insensível a maiúsculas/minúsculas.
+`alimentacao` e `alimentação` são aliases da categoria canônica `alimentacao`;
+o valor emitido em `itens[].categoria` é sempre o nome canônico.
 Qualquer outra categoria recebe `status = "recusado"` e motivo
 "Categoria não coberta pela política de reembolso".
 
@@ -244,31 +259,30 @@ Despesas com `data` fora desse intervalo recebem `status = "ignorado"` e motivo
 
 ### RN-008 — Estornos (valores negativos)
 
-**Regra:** Despesas com `valor` estritamente negativo são estornos.
-Esta regra é aplicada na **etapa 5 da pipeline** (antes da verificação de categoria, nota fiscal e limites diários).
-O valor absoluto do estorno é subtraído do `valor_original` **agregado** de todas
-as despesas da mesma `categoria` (normalizada) e mesmo `fornecedor`
-(insensível a maiúsculas) no mesmo período de competência que **já passaram pelas
-etapas 1 a 3** (normalização, período e deduplicação) **e não são elas mesmas estornos**.
-Despesas recusadas em etapas posteriores (categoria inválida, falta de nota fiscal)
-**não fazem parte do grupo compensável** — o estorno só reduz despesas que chegaram
-à etapa de limites (etapa 9) sem ter sido descartadas antes.
-Se o resultado do agregado ficar negativo ou zero, nenhuma despesa desse grupo
-terá reembolso.
+**Regra:** Despesas com `valor` estritamente negativo são estornos. Na etapa 5,
+o sistema associa cada estorno a um grupo candidato pela mesma `categoria`
+(normalizada), `fornecedor` (insensível a maiúsculas) e período de competência,
+após normalização, filtro de período e deduplicação. Essa associação não altera
+valores e não exclui a despesa das etapas posteriores.
+
+Após categoria, nota fiscal e inferência de diárias, somente despesas elegíveis
+formam o grupo compensável. A nota fiscal é sempre avaliada sobre `valor_original`,
+sem considerar qualquer estorno. Na etapa de aplicação efetiva, os estornos do
+grupo são processados pela posição no array de entrada; cada estorno é aplicado
+sequencialmente às despesas elegíveis também pela posição no array, reduzindo
+primeiro a primeira despesa até zerar seu saldo e prosseguindo para a seguinte.
+Nenhuma despesa pode ter valor efetivo negativo e excedentes não são transportados
+para outros grupos.
+
 O estorno em si é marcado `ignorado` com motivo "Estorno: compensou despesas de
-`<categoria>` do fornecedor `<fornecedor>` no período".
-Se não existir nenhuma despesa compatível (grupo vazio após as etapas 1 a 4),
-o estorno é marcado `ignorado` com motivo "Estorno sem despesa correspondente para compensar".
+`<categoria>` do fornecedor `<fornecedor>` no período". Se não existir nenhuma
+despesa elegível para compensar, o estorno é marcado `ignorado` com motivo
+"Estorno sem despesa elegível para compensar". Se o valor efetivo de uma despesa
+for reduzido a zero, ela não recebe reembolso.
 
 **Origem:** política do RH, item 8.
 
-**Aceite:** d-009 (−R$ 45,00, `transporte_urbano`, `TaxiApp`) é processada na etapa 5.
-Nesse ponto, d-003 (R$ 100,00) passou pelas etapas 1–4 e está no grupo; d-004 (R$ 100,01)
-também passou pelas etapas 1–4 e está no grupo (ainda não foi recusada por nota fiscal,
-que ocorre na etapa 7). Total do grupo antes do estorno: R$ 200,01. Após o estorno: R$ 155,01.
-Na etapa 7, d-004 é recusada por falta de nota fiscal e sai do grupo. Na etapa 9,
-apenas d-003 chega ao cálculo de limite diário, com valor efetivo R$ 100,00 − R$ 45,00 = R$ 55,00.
-R$ 55,00 < R$ 80,00 → d-003 `aprovado`, reembolsável = R$ 55,00.
+**Aceite:** d-009 (−R$ 45,00, `transporte_urbano`, `TaxiApp`) é associado na etapa 5 ao grupo candidato com d-003 e d-004, sem alterar seus valores. Na etapa 7, d-004 é recusada por falta de nota fiscal com base em seu `valor_original` de R$ 100,01. Na etapa 9, d-009 é aplicado sequencialmente somente a d-003, reduzindo seu valor efetivo de R$ 100,00 para R$ 55,00. R$ 55,00 < R$ 80,00 → d-003 `aprovado`, reembolsável = R$ 55,00.
 
 ---
 
@@ -293,10 +307,12 @@ no array é aplicado; o segundo é descartado como duplicata.
 
 **Regra:** Todos os valores reembolsáveis no output são arredondados para duas
 casas decimais usando half-up (0,005 arredonda para 0,01). Cálculos internos
-(proporções, limites) usam precisão máxima disponível; o arredondamento é
-aplicado apenas ao `valor_reembolsavel` final de cada item e aos totais do resumo.
-Para `total_solicitado`: os `valor_original` são somados em sua precisão exata
-(como vieram na entrada) e o resultado final é arredondado para duas casas decimais.
+(proporções, limites) usam precisão máxima disponível. Quando um grupo excede seu
+limite, os valores exatos são arredondados inicialmente para baixo e os centavos
+restantes são atribuídos aos itens com maiores restos fracionários; empates são
+resolvidos pela posição no array de entrada. A soma final dos itens é exatamente
+o limite do grupo. Para `total_solicitado`: os `valor_original` são somados em
+sua precisão exata e o resultado final é arredondado para duas casas decimais.
 Não se arredonda cada `valor_original` individualmente antes de somar.
 
 **Origem:** identificado na análise do arquivo de exemplo (d-011, valor R$ 33,333).
@@ -309,7 +325,8 @@ Não se arredonda cada `valor_original` individualmente antes de somar.
 
 **Regra:** Despesas com `valor` igual a zero são inválidas. O sistema as recusa
 com motivo "Valor zero não é uma despesa válida". Não se aplica arredondamento
-nem limite diário; a despesa não entra em nenhum total do resumo.
+nem limite diário. A despesa participa dos conjuntos de itens considerados em
+`total_solicitado` e `total_recusado`, com contribuição numérica de R$ 0,00.
 
 **Origem:** identificado na análise do schema de entrada (ausência de restrição explícita para zero).
 
@@ -366,12 +383,13 @@ o enunciado literal.
 **O que não estava claro:** o arquivo de entrada não inclui campo `num_diarias`.
 Sem esse dado, não é possível calcular o limite correto.
 
-**Decisão:** o sistema determina o número de diárias a partir das informações
-disponíveis no campo `descricao`. O número de diárias deve ser um inteiro positivo
-identificável na descrição; se não for possível determiná-lo de forma inequívoca,
-a despesa é recusada com motivo "Não foi possível determinar o número de diárias
-a partir da descrição". O mecanismo de extração (padrões aceitos, tratamento de
-ambiguidade na descrição) está descrito em `plan.md`.
+**Decisão:** o sistema determina o número de diárias a partir da `descricao`.
+A descrição válida contém exatamente um número inteiro positivo em algarismos
+imediatamente antes de `diária`, `diárias`, `noite` ou `noites`, sem distinção de
+maiúsculas/minúsculas. Número depois da expressão, número por extenso ou mais de
+um número candidato tornam a descrição inválida. Nesses casos, a despesa é
+recusada com motivo "Não foi possível determinar o número de diárias a partir da
+descrição".
 
 **Justificativa:** exigir um campo adicional na entrada quebraria o schema definido
 no desafio. O contrato — número inteiro positivo identificável na descrição — é
@@ -430,6 +448,8 @@ de lançamento no sistema? (b) como interpretar "período de competência"?
 
 **Decisão:** o critério é a **`data` da despesa** (data em que foi incorrida)
 estar dentro do intervalo `[periodo.inicio, periodo.fim]`, ambos inclusive.
+`periodo.competencia` é metadado informativo: deve respeitar o formato `AAAA-MM`,
+mas não é comparado com `periodo.inicio` ou `periodo.fim` e não decide a inclusão.
 Não há campo de "data de lançamento" na entrada.
 
 **Justificativa:** d-008 (data 2026-04-15, período 2026-07) é o caso de teste
@@ -515,9 +535,10 @@ seria não-convencional e potencialmente problemático em sistemas downstream.
 de proporção (RN-001, RN-002, RN-003), despesas que já foram recusadas (ex: falta
 de nota fiscal) ou ignoradas (ex: fora do período, duplicata) devem entrar na soma?
 
-**Decisão:** despesas recusadas ou ignoradas em etapas anteriores **não entram**
-no total diário para cálculo proporcional. Somente despesas que chegaram à etapa
-de limites são contabilizadas.
+**Decisão:** despesas recusadas ou ignoradas antes da aplicação efetiva de
+estornos **não entram** no total diário nem no grupo compensável. Estornos são
+associados antes das exclusões, mas só são aplicados às despesas que permanecem
+elegíveis após categoria, nota fiscal e inferência de diárias.
 
 **Justificativa:** incluir despesas recusadas no total diário distorceria o
 cálculo — o colaborador seria penalizado por uma despesa que ele mesmo não vai
@@ -579,21 +600,23 @@ O excedente é descartado para manter o sistema simples e auditável.
 
 Quando múltiplas regras incidem sobre uma despesa, a ordem é:
 
-1. **Normalização de categoria** (AMB-007) — converte para minúsculas; sem essa etapa as demais comparações são incorretas.
-2. **Valor zero** (RN-011) — `valor = 0` → `recusado`; nenhuma outra regra avaliada.
-3. **Período de competência** (RN-007) — fora do período → `ignorado`; nenhuma outra regra avaliada.
-4. **Duplicatas** (RN-009) — duplicata secundária (incluindo estornos duplicados) → `ignorado`; nenhuma outra regra avaliada.
-5. **Estornos** (RN-008) — valor negativo → reduz total agregado do grupo ou é `ignorado` se sem grupo compatível; nenhuma outra regra avaliada para o estorno.
-6. **Categoria permitida** (RN-006) — categoria desconhecida → `recusado`; nenhuma regra de limite avaliada.
-7. **Nota fiscal** (RN-005) — valor > R$ 100,00 sem nota → `recusado`; excluída do total diário.
-8. **Inferência de diárias** (RN-003 / AMB-003) — hospedagem sem padrão na descrição → `recusado`; excluída do total diário.
-9. **Limites diários** (RN-001, RN-002, RN-003) — aplicados sobre as despesas restantes; excedente → `aprovado_parcial`.
-10. **Arredondamento** (RN-010) — aplicado ao `valor_reembolsavel` final de cada item e aos totais.
+1. **Normalização de categoria** (AMB-007) — aplica caixa e aliases canônicos.
+2. **Período de competência** (RN-007) — fora do intervalo inclusivo → `ignorado`; nenhuma outra regra é avaliada.
+3. **Valor zero** (RN-011) — `valor = 0` → `recusado`; não entra nos limites.
+4. **Duplicatas** (RN-009) — duplicata secundária → `ignorado`.
+5. **Associação de estornos** (RN-008) — identifica grupos candidatos, sem alterar valores.
+6. **Categoria permitida** (RN-006) — categoria desconhecida → `recusado`.
+7. **Nota fiscal** (RN-005) — compara `valor_original`; valor acima de R$ 100,00 sem nota → `recusado`.
+8. **Inferência de diárias** (RN-003 / AMB-003) — descrição inválida → `recusado`.
+9. **Aplicação efetiva de estornos** (RN-008) — somente contra despesas elegíveis, sequencialmente.
+10. **Limites diários** (RN-001, RN-002, RN-003) — aplica limites e distribuição proporcional.
+11. **Arredondamento e fechamento** (RN-010) — maiores restos e empate pela posição no array.
 
-**Motivação:** regras de exclusão total têm prioridade sobre regras de limite
-parcial, evitando que despesas recusadas sejam contabilizadas no total diário
-e distorçam o cálculo dos demais itens. Duplicatas vêm antes de estornos para
-que um estorno duplicado não seja aplicado duas vezes antes de ser descartado.
+**Motivação:** o filtro de período ocorre antes da validação de valor zero para
+ignorar imediatamente despesas fora da competência. A associação de estornos é
+separada da aplicação efetiva para que nota fiscal e diárias sejam avaliadas sobre
+as despesas originais e somente despesas elegíveis sejam compensadas. Regras de
+exclusão total não participam dos limites diários.
 
 ---
 
@@ -602,23 +625,26 @@ que um estorno duplicado não seja aplicado duas vezes antes de ser descartado.
 O sistema está pronto quando:
 
 - [ ] Processar `exemplos/despesas-exemplo.json` sem erros e produzir JSON válido.
-- [ ] d-001 + d-002 (alimentação, 2026-07-03) terem soma de `valor_reembolsavel` exatamente R$ 60,00 (±R$ 0,01 por arredondamento distribuído).
+- [ ] d-001 + d-002 (alimentação, 2026-07-03) terem soma de `valor_reembolsavel` exatamente R$ 60,00, com eventual resíduo distribuído por maiores restos e empate pela posição no array.
 - [ ] d-003 (R$ 100,00 sem nota) **não** ser recusada por falta de nota fiscal; ter `valor_reembolsavel` = R$ 55,00 (após redução pelo estorno d-009 de −R$ 45,00; valor efetivo R$ 55,00 < limite de R$ 80,00 → `aprovado`).
 - [ ] d-004 (R$ 100,01 sem nota) ser `recusado` com motivo de nota fiscal; **não** entrar no total diário de transporte.
 - [ ] d-005 (`coworking`) ser `recusado` com motivo de categoria.
 - [ ] d-006 ser processada normalmente; d-007 ser `ignorado` (duplicata de d-006).
 - [ ] d-008 ser `ignorado` (fora do período de competência).
-- [ ] d-009 (estorno −R$ 45,00) ser `ignorado` e reduzir o total agregado de `transporte_urbano` + `TaxiApp` em R$ 45,00.
-- [ ] d-010 ("Hotel Rio - 2 diárias") ter `num_diarias` inferido como 2; limite = R$ 500,00; `valor_reembolsavel` = R$ 480,00.
+- [ ] d-009 (estorno −R$ 45,00) ser associado ao grupo candidato, ser `ignorado` e reduzir sequencialmente apenas a despesa elegível d-003 em R$ 45,00; d-004 deve ser excluída antes da aplicação por nota fiscal baseada no valor original.
+- [ ] d-010 ("Hotel Rio - 2 diárias") ter `num_diarias` = 2, `limite_unitario_diaria` = R$ 250,00, `limite_item` = R$ 500,00, `limite_grupo` = R$ 500,00 e `valor_reembolsavel` = R$ 480,00.
 - [ ] d-011 ter `valor_reembolsavel` de R$ 33,33.
 - [ ] d-013 ser `recusado` por falta de nota fiscal.
-- [ ] d-014 (`ALIMENTACAO`) ser tratada como `alimentacao`.
+- [ ] d-014 (`ALIMENTACAO`) ser tratada como `alimentacao`; a forma acentuada `alimentação` também deve produzir o canônico `alimentacao`.
 - [ ] `resumo.total_reembolsavel` = soma dos `valor_reembolsavel` de itens `aprovado` ou `aprovado_parcial`.
 - [ ] `resumo.total_solicitado` = soma dos `valor_original` de itens `aprovado`, `aprovado_parcial` e `recusado` (exclui `ignorado`).
 - [ ] `resumo.total_recusado` = `total_solicitado` − `total_reembolsavel`.
 - [ ] CLI aceitar `--input` e `--output` e escrever o arquivo de saída corretamente.
 - [ ] Todos os testes automatizados passarem.
-- [ ] **Critério de integração** para `exemplos/despesas-exemplo.json` (aplicando todas as regras combinadas): `resumo.total_solicitado` = R$ 1.765,94; `resumo.total_reembolsavel` = R$ 791,43; `resumo.total_recusado` = R$ 974,51. Itens `ignorado`: d-007, d-008, d-009. Invariante: 1.765,94 = 791,43 + 974,51.
+- [ ] Despesas fora do período serem ignoradas antes da validação de valor zero.
+- [ ] Hospedagens elegíveis da mesma data emitirem o mesmo `limite_grupo`; os quatro campos de auditoria serem omitidos para outras categorias e inferências malsucedidas.
+- [ ] `periodo.competencia` aceitar somente o formato `AAAA-MM` e não decidir a inclusão da despesa.
+- [ ] **Critério de integração pendente de validação:** após a implementação das regras v1.3, recalcular `exemplos/despesas-exemplo.json` e confirmar ou atualizar `resumo.total_solicitado`, `resumo.total_reembolsavel` e `resumo.total_recusado`, os itens `ignorado` e a invariante `total_solicitado = total_reembolsavel + total_recusado`.
 
 ---
 
