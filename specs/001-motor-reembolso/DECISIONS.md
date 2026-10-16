@@ -10,6 +10,79 @@ Ordem cronológica inversa: a mais recente primeiro.
 
 ---
 
+## D-003 — Atualização da spec v1.2 para v1.3 · 2026-10-16
+
+**Gatilho:** resolução das inconsistências identificadas na auditoria documental da versão 1.2.
+
+### A1 — Estornos em duas fases
+- **Decisão:** estornos são associados a grupos candidatos antes das exclusões, mas aplicados somente após categoria, nota fiscal e diárias, contra despesas elegíveis.
+- **Motivo:** separar associação de compensação e eliminar a contradição da RN-008.
+- **Regras afetadas:** RN-005, RN-008, AMB-010, seção 8.
+- **Tasks impactadas:** T-007A, T-007B, T-009, T-012.
+- **Testes:** estorno associado a item recusado por nota; aplicação apenas a elegíveis; integração d-003/d-004/d-009.
+
+### A2 — Distribuição sequencial de múltiplos estornos
+- **Decisão:** estornos são processados pela posição no array e aplicados sequencialmente às despesas elegíveis pela mesma ordem.
+- **Motivo:** comportamento determinístico e auditável.
+- **Regras afetadas:** RN-008, AMB-008, AMB-011.
+- **Tasks impactadas:** T-007A, T-007B.
+- **Testes:** múltiplos estornos; estorno atravessando duas despesas; excedente descartado.
+
+### A3 — Hospedagens múltiplas
+- **Decisão:** o limite do grupo de hospedagem na mesma data é a soma dos limites individuais.
+- **Motivo:** preservar a quantidade de diárias de cada item.
+- **Regras afetadas:** RN-003.
+- **Tasks impactadas:** T-011A, T-011B, T-011C, T-014A, T-015A.
+- **Testes:** hospedagens na mesma data com quantidades diferentes de diárias.
+
+### A4 — Resíduo de arredondamento
+- **Decisão:** resíduos são distribuídos pelos maiores restos fracionários; empate pela posição no array; a soma fecha exatamente o limite.
+- **Motivo:** eliminar divergências de centavos.
+- **Regras afetadas:** RN-001, RN-002, RN-003, RN-010.
+- **Tasks impactadas:** T-003, T-011A, T-011B, T-015B.
+- **Testes:** resíduos, empates, limites exatos e fechamento de grupos.
+
+### A5 — Contrato fechado de diárias
+- **Decisão:** aceitar exatamente um número inteiro positivo em algarismos imediatamente antes de diária(s) ou noite(s); rejeitar número depois, número por extenso e múltiplos candidatos.
+- **Motivo:** tornar AMB-003 verificável sem prescrever mecanismo técnico.
+- **Regras afetadas:** RN-003, AMB-003.
+- **Tasks impactadas:** T-010, T-011A, T-011C.
+- **Testes:** padrões válidos e inválidos do contrato.
+
+### A6 — Valor zero
+- **Decisão:** o filtro de período ocorre antes da validação de valor zero; valor zero dentro do período é recusado, não entra nos limites e participa dos conjuntos dos totais com contribuição zero.
+- **Motivo:** definir a precedência da pipeline e eliminar a contradição de RN-011.
+- **Regras afetadas:** RN-007, RN-011, seção 4.2.
+- **Tasks impactadas:** T-005, T-013, T-017.
+- **Testes:** zero dentro e fora do período; composição dos totais.
+
+### A7 — Auditoria de hospedagem
+- **Decisão:** itens de hospedagem cuja quantidade de diárias foi determinada com sucesso emitem `num_diarias`, `limite_unitario_diaria`, `limite_item` e `limite_grupo`; os campos são omitidos nos demais casos; `limite_grupo` é repetido na mesma data.
+- **Motivo:** tornar quantidade e limites auditáveis.
+- **Regras afetadas:** RN-003, seção 4.2.
+- **Tasks impactadas:** T-011A, T-011C, T-014A, T-015A.
+- **Testes:** presença, valores, repetição e omissão dos campos.
+
+### A8 — Aliases de acentuação
+- **Decisão:** `alimentacao` e `alimentação` são aliases; a saída usa sempre `alimentacao`.
+- **Motivo:** aceitar variação ortográfica explicitamente, sem normalização indiscriminada.
+- **Regras afetadas:** RN-006, AMB-007.
+- **Tasks impactadas:** T-004, T-008, T-015A.
+- **Testes:** aliases, caixa e categoria canônica.
+
+### A9 — Competência como metadado
+- **Decisão:** validar somente o formato `AAAA-MM`; `periodo.competencia` não é comparado com início/fim; inclusão depende exclusivamente do intervalo inclusivo de datas.
+- **Motivo:** manter a data da despesa e o intervalo como critério operacional.
+- **Regras afetadas:** RN-007, AMB-006.
+- **Tasks impactadas:** T-002, T-005.
+- **Testes:** formato inválido, competência divergente e filtro por intervalo.
+
+**Referência histórica:** D-003 substitui, para a spec v1.3, as partes de D-002 relativas à pipeline, ao momento de aplicação de estornos e à estratégia de arredondamento. D-002 permanece preservada como histórico da versão 1.2.
+
+**Totais de integração:** mantidos provisoriamente em R$ 1.765,94 solicitado, R$ 791,43 reembolsável e R$ 974,51 recusado; a confirmação permanece pendente de validação de integração após implementação das regras 1.3.
+
+---
+
 ## D-002 — Revisão de ambiguidades e lacunas (15 achados) · 2026-10-02
 
 **Gatilho:** revisão sistemática da spec v1.1 cruzada com `DESAFIO.md`, `RUBRICA.md`
