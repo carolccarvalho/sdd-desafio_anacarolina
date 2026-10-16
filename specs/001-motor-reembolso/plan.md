@@ -1,188 +1,228 @@
 # Plano Técnico — Motor de Cálculo de Reembolso
 
-**Versão:** 1.2 · **Baseado na spec:** 1.2
+**Versão:** 1.3 · **Baseado na spec:** 1.3
 
-> Aqui mora o COMO. Este arquivo pode e deve falar de linguagem, biblioteca e
-> arquitetura. O que ele **não** pode é introduzir regra de negócio nova — se
-> apareceu uma, ela pertence à `spec.md`.
+> Aqui mora o COMO. Este arquivo pode falar de linguagem, biblioteca e
+> arquitetura, mas não cria regras de negócio novas. Regras e comportamentos
+> obrigatórios vêm exclusivamente de `spec.md`.
 
 ---
 
 ## 1. Stack
 
-| Escolha | O quê | Por quê | O que descartei e por quê |
+| Escolha | O quê | Por quê | Alternativa descartada |
 |---|---|---|---|
-| Linguagem | Node.js 20 (JavaScript ESM) | Ubíquo, sem dependência de runtime extra além do Node, bom suporte a JSON nativo | TypeScript: adicionaria build step desnecessário para um projeto de escopo fixo |
-| CLI | `node --input-type=module` + `process.argv` nativo | Sem dependência extra para parsing de `--input` e `--output` | `commander` ou `yargs`: overhead desnecessário para dois flags fixos |
-| Testes | `node:test` + `node:assert` (test runner nativo do Node 20) | Zero dependências, saída TAP compatível, suficiente para testes unitários e de integração | Jest: mais poder do que o necessário; adiciona `node_modules` pesado sem ganho real aqui |
-| Aritmética monetária | Aritmética em **inteiros de centésimos** (multiplicar por 100, operar em inteiros, dividir no output) | Ponto flutuante acumula erro em divisões; `0.1 + 0.2 !== 0.3` em JS. Operar em inteiros elimina esse risco | `decimal.js` ou `big.js`: bibliotecas externas robustas, mas desnecessárias quando a estratégia de inteiros resolve o problema sem dependência |
-| Parsing/validação de entrada | Validação manual com mensagens explícitas | Mantém controle total sobre as mensagens de erro; sem schema extra | `zod` ou `ajv`: adicionariam dependência externa e gerariam mensagens genéricas |
+| Linguagem | Node.js 20 (JavaScript ESM) | Runtime disponível e JSON nativo | TypeScript, por exigir build adicional |
+| CLI | `process.argv` nativo | Apenas dois argumentos fixos | `commander`/`yargs`, por adicionarem dependências |
+| Testes | `node:test` e `node:assert` | Runner nativo e sem dependências | Jest/Vitest, por custo desnecessário |
+| Validação | Validação manual | Mensagens de erro controladas | Bibliotecas de schema, por adicionarem dependências |
 
 ---
 
-## 2. Arquitetura
+## 2. Arquitetura e pipeline
 
-```
+A separação é feita entre I/O, orquestração e regras puras:
+
+```text
 src/
-├── cli.js          → ponto de entrada: lê args, chama loader, chama motor, escreve saída
-├── loader.js       → lê e valida o JSON de entrada; lança erro se inválido
-├── engine.js       → orquestra as fases de processamento; retorna resultado completo
+├── cli.js          entrada de argumentos, execução e escrita do resultado
+├── loader.js       leitura e validação estrutural do JSON
+├── engine.js       orquestração das fases
 ├── rules/
-│   ├── normalize.js    → fase 1: normalização de categoria
-│   ├── valor-zero.js   → fase 2: rejeição de valor zero (RN-011)
-│   ├── periodo.js      → fase 3: filtro de período de competência (RN-007)
-│   ├── duplicatas.js   → fase 4: detecção e marcação de duplicatas (RN-009)
-│   ├── estornos.js     → fase 5: compensação de estornos (RN-008)
-│   ├── categoria.js    → fase 6: validação de categoria permitida (RN-006)
-│   ├── nota-fiscal.js  → fase 7: exigência de nota fiscal (RN-005)
-│   ├── diarias.js      → fase 8: inferência de diárias para hospedagem (AMB-003)
-│   └── limites.js      → fase 9: aplicação de limites diários (RN-001, RN-002, RN-003)
-├── arredondamento.js   → fase 10: arredondamento half-up (RN-010)
-└── resumo.js           → calcula total_solicitado, total_reembolsavel, total_recusado
+│   ├── normalize.js       fase 1: categorias canônicas
+│   ├── periodo.js         fase 2: intervalo de datas
+│   ├── valor-zero.js      fase 3: valor zero
+│   ├── duplicatas.js      fase 4: deduplicação
+│   ├── estornos.js        fases 5 e 9: associação e aplicação
+│   ├── categoria.js       fase 6: categorias permitidas
+│   ├── nota-fiscal.js     fase 7: nota sobre valor original
+│   ├── diarias.js         fase 8: contrato de diárias
+│   └── limites.js         fase 10: limites e resíduos
+├── arredondamento.js      fase 11: representação monetária final
+└── resumo.js              totais do resultado
 ```
 
-**Fluxo:**
-```
-arquivo JSON → loader.js → engine.js → [normalize → valor-zero → periodo →
-duplicatas → estornos → categoria → nota-fiscal → diarias → limites → arredondamento] →
-resumo.js → objeto resultado → cli.js → arquivo JSON de saída
-```
+O fluxo obrigatório possui 11 etapas:
 
-**Fronteiras:**
-- `cli.js` e `loader.js` são I/O puro — não conhecem regras de negócio.
-- `rules/` é núcleo de negócio puro — não lê arquivos nem escreve stdout.
-- `engine.js` é o orquestrador — conhece a ordem das fases mas não implementa nenhuma regra diretamente.
-- Essa separação garante que cada fase pode ser testada unitariamente sem montar CLI, e que uma mudança de requisito (ex: nova regra, nova fase) toca um único arquivo.
+1. normalização de categoria e aliases;
+2. filtro de período;
+3. validação de valor zero;
+4. deduplicação;
+5. associação de estornos a grupos candidatos, sem alterar valores;
+6. validação de categoria permitida;
+7. validação de nota fiscal sobre `valor_original`;
+8. validação/inferência de diárias;
+9. aplicação efetiva de estornos somente às despesas elegíveis;
+10. limites diários e distribuição proporcional;
+11. arredondamento final e fechamento de resíduos.
+
+A associação de estornos e sua aplicação são operações distintas. A fase 5
+preserva referências ao grupo candidato. A fase 9 recebe o estado após as fases
+6–8 e aplica os estornos apenas às despesas que continuam elegíveis. O engine
+conhece a ordem; cada regra não conhece a implementação das demais.
+
+`cli.js` e `loader.js` não implementam regras de negócio. `rules/` não lê nem
+escreve arquivos. `resumo.js` opera apenas sobre o estado final produzido pelo
+engine.
 
 ---
 
-## 3. Modelo de dados
+## 3. Precisão e representação monetária
 
-### Despesa interna (objeto enriquecido durante o processamento)
+A entrada preserva `valor_original` exatamente como recebida até os pontos
+previstos na spec. Não se converte prematuramente um valor como `33,333` para
+centavos, pois isso perderia precisão exigida por RN-010 e pelo
+`total_solicitado`.
+
+A implementação deve manter uma representação decimal exata para somas,
+subtrações e proporções internas. Se a representação numérica nativa for usada,
+a conversão deve preservar a escala original ou utilizar uma representação
+segura equivalente; a escolha não pode alterar o valor original antes do
+arredondamento definido pela spec.
+
+O arredondamento para duas casas ocorre:
+
+- no `valor_reembolsavel` final de cada item;
+- nos totais do resumo;
+- na serialização dos campos monetários de auditoria.
+
+`total_solicitado` soma os `valor_original` dos status aplicáveis sem arredondar
+cada item antes da soma. O resultado final é arredondado para duas casas.
+
+### Fechamento de grupos limitados
+
+Para cada grupo cujo total exceda o limite:
+
+1. calcular o valor proporcional exato de cada item;
+2. converter cada valor para centavos por truncamento para baixo;
+3. calcular quantos centavos faltam para alcançar exatamente o limite;
+4. ordenar itens pelo maior resto fracionário;
+5. em empate, ordenar pela posição original no array de entrada;
+6. adicionar um centavo aos primeiros itens necessários.
+
+A soma final dos itens deve ser exatamente o limite do grupo. O algoritmo é
+aplicado separadamente para alimentação, transporte urbano e cada grupo diário
+de hospedagem.
+
+---
+
+## 4. Modelo de dados interno
+
+O objeto interno preserva os campos de entrada e adiciona estado de processamento:
 
 ```js
 {
   id: string,
-  data: string,              // AAAA-MM-DD
-  categoria: string,         // normalizada para minúsculas
+  data: string,
+  categoria: string,              // nome canônico
   descricao: string,
-  fornecedor: string,        // original (comparações usam toLowerCase())
-  valor: number,             // valor original da entrada (pode ser negativo)
-  valorCentavos: integer,    // valor × 100, arredondado para inteiro (operações internas)
+  fornecedor: string,
+  valor: decimal,                 // valor original sem perda de escala
+  valor_original: decimal,
   tem_nota_fiscal: boolean,
-  num_diarias: integer|null, // inferido da descricao para hospedagem; null se não aplicável
-  status: string,            // 'pendente' → evolui para aprovado/aprovado_parcial/recusado/ignorado
-  valorReembolsavelCentavos: integer, // calculado ao longo das fases; 0 se recusado/ignorado
-  motivo: string             // justificativa legível; preenchido quando status muda
+  posicaoEntrada: integer,
+  num_diarias: integer | ausente,
+  limite_unitario_diaria: decimal | ausente,
+  limite_item: decimal | ausente,
+  limite_grupo: decimal | ausente,
+  grupoEstorno: referência | ausente,
+  valorEfetivo: decimal,
+  valorReembolsavel: decimal,
+  status: string,
+  motivo: string
 }
 ```
 
-### Resultado final (objeto de saída)
-
-Conforme definido na spec.md seção 4.2. Valores monetários convertidos de centavos para reais com duas casas decimais no momento da serialização.
+Os quatro campos de auditoria de hospedagem só são criados quando a quantidade
+de diárias foi determinada com sucesso. Eles são omitidos, nunca preenchidos
+com `null`, para outras categorias ou hospedagens cuja inferência falhou. Quando
+presentes, `limite_grupo` é atribuído a todos os itens de hospedagem da mesma
+data cuja quantidade de diárias foi determinada com sucesso.
 
 ---
 
-## 4. Como a política é representada
+## 5. Representação técnica da política
 
-Os limites e categorias permitidas vivem em `src/politica.js` como constantes exportadas:
+Os limites base e categorias canônicas ficam centralizados em um módulo de
+política:
 
 ```js
-export const LIMITES = {
-  alimentacao:      { centavos: 6000  },   // R$ 60,00
-  transporte_urbano:{ centavos: 8000  },   // R$ 80,00
-  hospedagem:       { centavos: 25000 },   // R$ 250,00 por diária
-};
-
-export const CATEGORIAS_PERMITIDAS = ['alimentacao', 'transporte_urbano', 'hospedagem'];
-export const LIMITE_NOTA_FISCAL_CENTAVOS = 10000; // R$ 100,00
+LIMITES = {
+  alimentacao: 60.00,
+  transporte_urbano: 80.00,
+  hospedagem_por_diaria: 250.00
+}
+CATEGORIAS_PERMITIDAS = ["alimentacao", "transporte_urbano", "hospedagem"]
+ALIASES_CATEGORIA = { "alimentação": "alimentacao" }
+LIMITE_NOTA_FISCAL = 100.00
 ```
 
-**Motivação:** centralizar os limites em um único arquivo significa que uma mudança na política (ex: limite de alimentação passa de R$ 60 para R$ 80) toca exatamente uma linha em um único arquivo, sem risco de inconsistência entre regras. Se a política mudar para um arquivo de configuração externo, só `politica.js` precisa mudar.
+A comparação de fornecedor para agrupamento usa uma forma técnica
+case-insensitive. A normalização de categoria utiliza a tabela explícita de
+aliases da spec; não se generaliza remoção de acentos para outras categorias.
+
+`periodo.competencia` é validado pelo loader somente pelo formato `AAAA-MM` e
+copiado ao resultado. A inclusão de despesas usa apenas `data` comparada ao
+intervalo inclusivo de `periodo.inicio` e `periodo.fim`.
 
 ---
 
-## 5. Decisões técnicas
+## 6. Detalhamento técnico das fases
 
-### DT-001 — Aritmética em centavos inteiros
+### 6.1 Normalização, período, zero e duplicatas
 
-**Contexto:** valores monetários em ponto flutuante acumulam erro em divisões (cálculo proporcional de RN-001). Ex: `72.50 / 110.50 * 60` em IEEE 754 pode resultar em `39.36968...` em vez de `39.37`.
+A normalização preserva a posição original e produz o nome canônico. O filtro de
+período ocorre antes da validação de valor zero. A deduplicação usa data,
+categoria canônica, fornecedor case-insensitive e valor, mantendo a primeira
+posição do array.
 
-**Decisão:** todos os valores são convertidos para inteiros de centavos na entrada (`Math.round(valor * 100)`). Operações internas (soma, subtração, proporção) operam nesses inteiros. A divisão para proporção usa aritmética de ponto flutuante apenas no momento do cálculo da fração, mas o arredondamento final é aplicado imediatamente sobre o resultado, sem acumular operações.
+### 6.2 Associação e aplicação de estornos
 
-**Alternativa descartada:** biblioteca `decimal.js` — resolve o problema mas adiciona dependência externa desnecessária para este escopo.
+A associação cria grupos por categoria, fornecedor e período após as fases 1–4.
+Estornos duplicados já descartados não são associados. A aplicação ocorre só
+após categoria, nota e diárias. Estornos são ordenados pela posição original;
+despesas elegíveis também. O saldo de cada estorno reduz sequencialmente os
+valores efetivos das despesas, sem permitir saldo negativo.
 
-**Consequência:** fácil de auditar (cada valor tem representação exata em inteiro), sem surpresas de arredondamento acumulado. A conversão de volta para reais no output (`centavos / 100`) é trivial.
+### 6.3 Limites e hospedagem
 
----
+Alimentação e transporte agrupam por data e categoria. Hospedagem agrupa por
+data; o limite do grupo é a soma de `num_diarias × 250,00` de cada item
+hospedagem elegível. A fase produz os quatro campos de auditoria para esses
+itens e usa o algoritmo de fechamento descrito na seção 3.
 
-### DT-002 — Pipeline de fases sequencial explícito
+### 6.4 Saída
 
-**Contexto:** a spec define uma ordem estrita de aplicação de 10 regras (seção 8, spec v1.2). Uma implementação que mistura as regras numa única função é difícil de testar e de modificar.
-
-**Decisão:** cada fase é uma função pura que recebe o array de despesas (com estado acumulado) e retorna o mesmo array modificado. O `engine.js` encadeia as fases em ordem. Nenhuma fase conhece as outras.
-
-**Alternativa descartada:** classe `Motor` com métodos encadeados — mais verboso sem ganho real de testabilidade para este tamanho de projeto.
-
-**Consequência:** adicionar, remover ou reordenar uma fase requer mudar apenas `engine.js`. Cada fase tem seu próprio arquivo de teste.
-
----
-
-### DT-003 — Test runner nativo do Node 20
-
-**Contexto:** o projeto precisa de testes automatizados rastreáveis por requisito (spec → task → teste).
-
-**Decisão:** usar `node:test` e `node:assert` disponíveis nativamente no Node 20, sem instalar Jest ou Vitest.
-
-**Alternativa descartada:** Jest — mais ergonômico, mas adiciona `node_modules` pesado e requer configuração de ESM. Para este escopo, o ganho não justifica o custo.
-
-**Consequência:** zero dependências de teste. O comando `node --test tests/**/*.test.js` roda tudo. Ligeiramente menos ergonômico (sem `expect().toBe()`), mas suficiente.
+A saída segue o schema da seção 4.2 da spec. Campos de auditoria de hospedagem
+são serializados apenas quando presentes no estado interno. Campos ausentes não
+são serializados como `null`.
 
 ---
 
-### DT-004 — Inferência de diárias via regex na descrição
+## 7. Estratégia de testes
 
-**Contexto:** o campo `num_diarias` não existe na entrada (AMB-003). A spec decidiu inferir da `descricao`.
-
-**Decisão:** regex `/(\d+)\s*(?:di[aá]rias?|noites?)/i` aplicada à `descricao`. Captura o número antes ou depois das palavras-chave. Se não houver match ou o número for ≤ 0, a despesa é recusada.
-
-**Alternativa descartada:** exigir `num_diarias` como campo obrigatório na entrada — quebraria o schema do desafio que não prevê esse campo.
-
-**Consequência:** funciona para os casos do exemplo (`"2 diárias"`, `"3 noites"`). Frágil para descrições criativas (`"fim de semana"`). Documentado como limitação na spec (seção 10).
-
----
-
-## 6. Estratégia de testes
-
-- **Nível:** majoritariamente **unitário por fase** (um arquivo de teste por arquivo de regra). Um teste de **integração ponta-a-ponta** processa `despesas-exemplo.json` e verifica o resultado completo.
-- **Cada `RN-NNN` da spec tem teste:** sim — cada arquivo `tests/rules/RN-NNN.test.js` mapeia diretamente para a regra correspondente.
-- **Casos de borda da seção 7 da spec:** cada linha da tabela de casos de borda tem um caso de teste nomeado explicitamente (ex: `'RN-005: d-003 R$100,00 sem nota não é recusado'`).
-- **Nomenclatura:** `describe('RN-001 — Limite diário de alimentação', () => { it('soma proporcional quando total > limite', ...) })`. O nome do `describe` referencia o código da regra da spec — isso fecha a rastreabilidade spec → teste sem precisar ler o código.
-
-```
-tests/
-├── rules/
-│   ├── RN-001-alimentacao.test.js
-│   ├── RN-002-transporte.test.js
-│   ├── RN-003-hospedagem.test.js
-│   ├── RN-005-nota-fiscal.test.js
-│   ├── RN-006-categoria.test.js
-│   ├── RN-007-periodo.test.js
-│   ├── RN-008-estornos.test.js
-│   ├── RN-009-duplicatas.test.js
-│   ├── RN-010-arredondamento.test.js
-│   └── RN-011-valor-zero.test.js
-└── integracao/
-    └── despesas-exemplo.test.js   ← processa o JSON completo, verifica cada item
-```
+- testes unitários por fase, com nomes RN/AMB;
+- testes específicos para associação versus aplicação de estornos;
+- testes de precisão com valores de três casas;
+- testes de maiores restos e desempate por posição;
+- testes de hospedagens múltiplas e campos auditáveis;
+- testes de contrato de descrições de diárias;
+- testes de aliases e competência informativa;
+- testes de valor zero dentro e fora do período;
+- testes do loader para JSON inválido, campos ausentes e erros de formato;
+- testes da CLI para sucesso, argumentos ausentes, arquivo inexistente e JSON
+  inválido;
+- teste de lista vazia;
+- integração completa do arquivo de exemplo, incluindo recálculo dos totais.
 
 ---
 
-## 7. Riscos
+## 8. Riscos técnicos
 
-| Risco | Probabilidade | O que faço se acontecer |
-|---|---|---|
-| Regex de inferência de diárias falha em novo formato de descrição | Média | A spec prevê recusa com motivo claro; o usuário corrige a descrição. Se o padrão for comum, ampliar a regex e registrar em DECISIONS.md |
-| Mudança de requisito (envelope do dia 2) altera um limite ou adiciona categoria | Alta (é o objetivo) | Alterar `politica.js` e/ou adicionar fase em `rules/`; reexecutar todos os testes |
-| Aritmética de centavos produz resultado inesperado em proporções muito pequenas | Baixa | Coberto pelos testes de arredondamento (RN-010); se surgir, revisar a ordem de `Math.round` na fase de limites |
-| JSON de entrada malformado ou com campos faltando | Média | `loader.js` valida campos obrigatórios e lança erro com mensagem clara antes de chamar o motor |
+| Risco | Mitigação |
+|---|---|
+| Perda de precisão em valores com mais de duas casas | preservar decimal original até o arredondamento final |
+| Resíduo diferente entre execuções | algoritmo de maiores restos com posição como desempate |
+| Estorno aplicado antes de exclusões | fases separadas e teste de integração d-003/d-004/d-009 |
+| Campos de hospedagem inconsistentes | gerar auditoria somente após inferência e calcular limite do grupo uma vez |
+| Erro de entrada mascarado | loader valida formato e CLI retorna erro em `stderr` com código não zero |
