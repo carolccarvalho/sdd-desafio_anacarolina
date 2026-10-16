@@ -1,6 +1,6 @@
 # Plano Técnico — Motor de Cálculo de Reembolso
 
-**Versão:** 1.3 · **Baseado na spec:** 1.3
+**Versão:** 1.4 · **Baseado na spec:** 1.4
 
 > Aqui mora o COMO. Este arquivo pode falar de linguagem, biblioteca e
 > arquitetura, mas não cria regras de negócio novas. Regras e comportamentos
@@ -69,18 +69,55 @@ engine.
 
 ## 3. Precisão e representação monetária
 
-A entrada preserva `valor_original` exatamente como recebida até os pontos
-previstos na spec. Não se converte prematuramente um valor como `33,333` para
-centavos, pois isso perderia precisão exigida por RN-010 e pelo
-`total_solicitado`.
+Valores monetários internos usam o tipo decimal exato `{ units: BigInt, scale: integer }`.
+O valor matemático é `units / 10^scale`; o sinal pertence a `units` e `scale` é
+inteiro não negativo. Zeros finais podem ser normalizados: `100`, `100.0` e
+`100.00` representam o mesmo valor financeiro. Nenhuma operação monetária
+interna usa `Number`, e nenhum `BigInt` é convertido para `Number` antes da
+fronteira de serialização.
 
-A implementação deve manter uma representação decimal exata para somas,
-subtrações e proporções internas. Se a representação numérica nativa for usada,
-a conversão deve preservar a escala original ou utilizar uma representação
-segura equivalente; a escolha não pode alterar o valor original antes do
-arredondamento definido pela spec.
+Exemplos da representação:
 
-O arredondamento para duas casas ocorre:
+```text
+0.1     → { units: 1n,     scale: 1 }
+1.005   → { units: 1005n,  scale: 3 }
+33.333  → { units: 33333n, scale: 3 }
+-45.123 → { units: -45123n, scale: 3 }
+```
+
+`Number` não é usado porque sua representação binária não garante soma decimal
+exata nem half-up decimal em fronteiras como `1.005 → 1.01` e `2.675 → 2.68`.
+A entrada é lida lexicalmente antes da conversão monetária: `JSON.parse` não
+pode converter valores monetários antes da criação do decimal interno, pois
+perderia precisão decimal. O parser deve aceitar números JSON válidos em
+notação científica e convertê-los exatamente (`1e-3 → 0,001`). A escala
+lexical original não precisa ser preservada; somente o valor decimal matemático
+exato deve ser preservado. Não se introduz limite funcional novo de magnitude,
+casas ou expoente.
+
+O parser lexical preserva o lexema numérico, separa sinal, mantissa e expoente,
+remove o ponto decimal e ajusta `scale = casas_da_mantissa - expoente`. Campos
+não monetários continuam sujeitos à validação estrutural existente. O parser
+deve rejeitar apenas JSON malformado ou número lexical inválido segundo o
+contrato JSON, sem criar regra de negócio adicional.
+
+Soma, subtração e comparação alinham as escalas multiplicando `units` por
+potências de dez. Multiplicação por inteiro mantém a escala; multiplicação entre
+decimais soma as escalas. Estornos, limites, totais e comparações usam somente
+essas operações exatas.
+
+Para grupos limitados, a divisão proporcional usa quociente e resto inteiros.
+Para cada item, calcula-se `numerator = units_do_item × target_centavos` e
+`denominator = units_do_total`; o quociente é o número de centavos truncado e o
+resto é mantido como fração racional. Restos `r1/d1` e `r2/d2` são comparados
+por multiplicação cruzada (`r1 × d2` versus `r2 × d1`). Restos matematicamente
+iguais são desempatados pela posição original no array.
+
+Half-up em duas casas calcula quociente e resto de `units × 100 / 10^scale` e
+arredonda para cima quando `2 × resto >= 10^scale`. Assim, `1.005` produz
+`1.01` e `2.675` produz `2.68` sem usar ponto flutuante.
+
+O arredondamento ocorre somente:
 
 - no `valor_reembolsavel` final de cada item;
 - nos totais do resumo;
@@ -89,15 +126,24 @@ O arredondamento para duas casas ocorre:
 `total_solicitado` soma os `valor_original` dos status aplicáveis sem arredondar
 cada item antes da soma. O resultado final é arredondado para duas casas.
 
+### Serialização segura
+
+Após o arredondamento final, valores com duas casas são convertidos para
+`Number` somente na fronteira de saída, porque o schema atual exige JSON
+numérico. A conversão parte de centavos inteiros e deve verificar que o valor
+convertido, quando reconvertido para centavos, preserva exatamente os mesmos
+centavos; caso contrário, a serialização deve falhar em vez de perder centavos
+silenciosamente. `BigInt` nunca é entregue diretamente a `JSON.stringify`.
+
 ### Fechamento de grupos limitados
 
 Para cada grupo cujo total exceda o limite:
 
-1. calcular o valor proporcional exato de cada item;
+1. calcular o valor proporcional exato de cada item com quociente e resto inteiros;
 2. converter cada valor para centavos por truncamento para baixo;
 3. calcular quantos centavos faltam para alcançar exatamente o limite;
-4. ordenar itens pelo maior resto fracionário;
-5. em empate, ordenar pela posição original no array de entrada;
+4. ordenar itens pelo maior resto comparado exatamente;
+5. em empate matemático, ordenar pela posição original no array de entrada;
 6. adicionar um centavo aos primeiros itens necessários.
 
 A soma final dos itens deve ser exatamente o limite do grupo. O algoritmo é
@@ -204,6 +250,11 @@ são serializados como `null`.
 - testes unitários por fase, com nomes RN/AMB;
 - testes específicos para associação versus aplicação de estornos;
 - testes de precisão com valores de três casas;
+- testes do parser JSON lexical para decimais, notação científica (`1e-3`) e preservação do valor matemático antes de `JSON.parse`;
+- testes de half-up em `1.005` e `2.675`;
+- testes de soma `0.1 + 0.2`, soma de valores com três casas e estornos com três casas;
+- testes de quociente/resto, maiores restos e empate matemático por posição;
+- testes de serialização segura e rejeição de perda silenciosa de centavos;
 - testes de maiores restos e desempate por posição;
 - testes de hospedagens múltiplas e campos auditáveis;
 - testes de contrato de descrições de diárias;
@@ -221,8 +272,9 @@ são serializados como `null`.
 
 | Risco | Mitigação |
 |---|---|
-| Perda de precisão em valores com mais de duas casas | preservar decimal original até o arredondamento final |
-| Resíduo diferente entre execuções | algoritmo de maiores restos com posição como desempate |
+| Perda de precisão em valores com mais de duas casas | decimal interno com `BigInt` e escala variável; parser lexical antes de `JSON.parse` monetário |
+| Resíduo diferente entre execuções | quociente/resto inteiro, comparação por multiplicação cruzada e posição como desempate |
 | Estorno aplicado antes de exclusões | fases separadas e teste de integração d-003/d-004/d-009 |
 | Campos de hospedagem inconsistentes | gerar auditoria somente após inferência e calcular limite do grupo uma vez |
-| Erro de entrada mascarado | loader valida formato e CLI retorna erro em `stderr` com código não zero |
+| Erro de entrada mascarado | parser lexical valida JSON e loader retorna erro em `stderr` com código não zero |
+| Perda de centavos na saída JSON | serialização a partir de centavos inteiros com round-trip verificável antes de produzir `number` |

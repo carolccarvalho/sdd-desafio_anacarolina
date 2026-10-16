@@ -21,13 +21,29 @@
   - **Testes:** `tests/loader.test.js`.
   - **Commit:** `feat(T-002): valida entrada e competência informativa`
 
-- [ ] **T-003 — Representação monetária e arredondamento final**
+- [ ] **T-003A — Núcleo decimal interno**
   - **Atende:** RN-010, AMB-009, A4/D-003 e D-004.
-  - **Faz:** preserva `valor_original`; fornece operações decimais exatas e arredondamento half-up na saída.
+  - **Faz:** define `DecimalInterno` com `{ units: BigInt, scale: integer }`; implementa alinhamento de escalas, soma, subtração, comparação, multiplicação, half-up decimal exato e conversão controlada para centavos.
   - **Depende de:** T-001.
-  - **Aceite:** `33.333` permanece exato internamente e sai como `33.33`; d-011 tem `status = aprovado` porque seu valor reembolsável interno corresponde integralmente ao valor efetivo elegível antes do arredondamento; o status é decidido antes do arredondamento de output; soma de originais é arredondada somente no total; conversões não perdem escala.
-  - **Testes:** `tests/rules/RN-010-arredondamento.test.js`.
-  - **Commit:** `feat(T-003): preserva precisão e arredonda valores finais`
+  - **Aceite:** `1.005 → 1.01`, `2.675 → 2.68`, `0.1 + 0.2 → 0.3`; valores com três casas permanecem exatos internamente até os pontos de arredondamento definidos pela spec; nenhuma operação interna usa `Number`.
+  - **Testes:** `tests/rules/decimal.test.js` e `tests/rules/RN-010-arredondamento.test.js`, cobrindo fronteiras half-up, soma decimal, alinhamento de escalas e valores com três casas.
+  - **Commit:** `feat(T-003A): cria núcleo decimal exato com BigInt`
+
+- [ ] **T-003B — Parser lexical e loader monetário**
+  - **Atende:** spec 4.1, RN-010, AMB-009 e A9/D-003.
+  - **Faz:** lê o JSON como texto; preserva lexemas numéricos até a conversão; implementa parser seguro para objetos, arrays, strings escapadas, booleanos, `null`, números negativos e notação científica; converte campos monetários para `DecimalInterno`; rejeita JSON inválido.
+  - **Depende de:** T-002 e T-003A.
+  - **Aceite:** números como `33.333`, `-45.123` e `1e-3` são convertidos exatamente; estruturas JSON válidas são preservadas; strings escapadas, arrays, objetos, booleanos e `null` são aceitos; JSON inválido produz erro controlado; nenhum valor monetário passa por `JSON.parse` como `Number` antes da conversão decimal.
+  - **Testes:** `tests/loader.test.js` e `tests/rules/parser-json.test.js`.
+  - **Commit:** `feat(T-003B): preserva lexemas no parser monetário`
+
+- [ ] **T-003C — Serialização monetária e migração de fronteira**
+  - **Atende:** RN-010, seção 4.2, D-004 e critérios de saída.
+  - **Faz:** impede que valores monetários internos cheguem diretamente ao `JSON.stringify`; converte valores finais para números de saída somente após arredondamento; verifica round-trip de centavos; adapta inicialmente loader e engine ao novo tipo.
+  - **Depende de:** T-003A e T-003B.
+  - **Aceite:** valores internos são serializados somente na fronteira; `33.333` sai como `33.33`; o round-trip preserva centavos; perda silenciosa de centavos é detectada e produz erro controlado; d-011 permanece `aprovado` por decisão anterior ao arredondamento.
+  - **Testes:** `tests/rules/serializacao-monetaria.test.js`, `tests/rules/RN-010-arredondamento.test.js` e teste de fronteira do engine.
+  - **Commit:** `feat(T-003C): migra fronteiras para serialização monetária segura`
 
 ## Fase 2 — Fases preliminares
 
@@ -115,11 +131,11 @@
 
 - [ ] **T-011B — Distribuição proporcional e resíduos**
   - **Atende:** RN-001/RN-002/RN-003/RN-010, A4/D-003 e D-004.
-  - **Faz:** calcula proporções, trunca inicialmente, distribui centavos pelos maiores restos e desempata pela posição original.
-  - **Depende de:** T-003, T-011A.
-  - **Aceite:** soma de grupo limitado é exatamente o limite; casos com resíduos e empate são determinísticos; teste diferencia arredondamento de apresentação de corte real por limite, mantendo d-011 como `aprovado` e d-003 como `aprovado` após estorno quando seu valor efetivo permanece integralmente dentro do limite.
-  - **Testes:** `tests/rules/distribuicao-residuos.test.js`.
-  - **Commit:** `feat(T-011B): fecha limites com distribuição de resíduos`
+  - **Faz:** calcula proporções com quociente e resto inteiros, trunca inicialmente, distribui centavos pelos maiores restos comparados por multiplicação cruzada e desempata pela posição original.
+  - **Depende de:** T-003A, T-003B, T-003C e T-011A.
+  - **Aceite:** soma de grupo limitado é exatamente o limite; casos com resíduos e empate matemático são determinísticos; teste diferencia arredondamento de apresentação de corte real por limite, mantendo d-011 como `aprovado` e d-003 como `aprovado` após estorno quando seu valor efetivo permanece integralmente dentro do limite.
+  - **Testes:** `tests/rules/distribuicao-residuos.test.js`, incluindo proporções, empate exato de restos e fechamento em centavos.
+  - **Commit:** `feat(T-011B): fecha limites com restos decimais exatos`
 
 - [ ] **T-011C — Auditoria de hospedagem**
   - **Atende:** RN-003, seção 4.2, A7/D-003.
@@ -139,10 +155,10 @@
 
 - [ ] **T-013 — Resumo e totais**
   - **Atende:** seção 4.2, RN-010, RN-011 e D-004.
-  - **Depende de:** T-003, T-012.
-  - **Aceite:** ignora itens `ignorado`; inclui recusados e zero no conjunto lógico; preserva precisão de originais; determina status antes do arredondamento; d-011 permanece `aprovado` e d-003 permanece `aprovado` após compensação quando seu valor efetivo está dentro do limite; satisfaz invariante dos totais.
-  - **Testes:** `tests/rules/resumo.test.js`, incluindo lista vazia.
-  - **Commit:** `feat(T-013): calcula resumo e invariante financeira`
+  - **Depende de:** T-003A, T-003B, T-003C, T-012.
+  - **Aceite:** ignora itens `ignorado`; inclui recusados e zero no conjunto lógico; preserva precisão de originais; determina status antes do arredondamento; d-011 permanece `aprovado` e d-003 permanece `aprovado` após compensação quando seu valor efetivo está dentro do limite; recompõe os totais com decimal exato e satisfaz a invariante dos totais.
+  - **Testes:** `tests/rules/resumo.test.js`, incluindo lista vazia, zero, ignorados e recomposição independente.
+  - **Commit:** `feat(T-013): calcula totais com decimal exato`
 
 ## Fase 5 — CLI e integração
 
@@ -162,17 +178,17 @@
 
 - [ ] **T-015A — Integração do arquivo de exemplo**
   - **Atende:** seção 9; D-003 A1–A9 e D-004, incluindo confirmação numérica dos totais.
-  - **Depende de:** T-012, T-013, T-014A.
-  - **Aceite:** verifica cada item, incluindo d-011 com `valor_original = 33,333`, `valor_reembolsavel = 33,33` e `status = aprovado`, d-003 como `aprovado` após estorno, d-004/d-009, d-010 e seus campos de auditoria, aliases, resíduos, d-007/d-008/d-009 ignorados com motivos definidos nas regras aplicáveis, schema de saída e lista de despesas vazia; usa os totais confirmados.
-  - **Testes:** `tests/integracao/despesas-exemplo.test.js` e caso de entrada vazia.
-  - **Commit:** `test(T-015A): valida integração do arquivo de exemplo`
+  - **Depende de:** T-003A, T-003B, T-003C, T-012, T-013, T-014A.
+  - **Aceite:** verifica cada item, incluindo d-011 com `valor_original = 33,333`, `valor_reembolsavel = 33,33` e `status = aprovado`, d-003 como `aprovado` após estorno, d-004/d-009, d-010 e seus campos de auditoria, aliases, resíduos, d-007/d-008/d-009 ignorados com motivos definidos nas regras aplicáveis, schema de saída e lista de despesas vazia; usa os totais confirmados após a migração decimal e valida a serialização segura.
+  - **Testes:** `tests/integracao/despesas-exemplo.test.js` e caso de entrada vazia, incluindo todos os itens e motivos ignorados.
+  - **Commit:** `test(T-015A): valida integração após migração decimal`
 
 - [ ] **T-015B — Recálculo e confirmação dos totais de integração**
   - **Atende:** seção 9, invariante dos totais e D-004.
-  - **Depende de:** T-015A.
-  - **Aceite:** recalcula e confirma a partir da saída real `total_solicitado = R$ 1.765,94`, `total_reembolsavel = R$ 790,43` e `total_recusado = R$ 975,51`; verifica `total_solicitado = total_reembolsavel + total_recusado` e registra a correção do provisório de R$ 791,43 causada pelo limite de R$ 60,00 aplicado a d-014.
-  - **Testes:** `tests/integracao/totais-exemplo.test.js`.
-  - **Commit:** `test(T-015B): confirma totais de integração`
+  - **Depende de:** T-003A, T-003B, T-003C, T-015A.
+  - **Aceite:** recalcula e confirma a partir da saída real `total_solicitado = R$ 1.765,94`, `total_reembolsavel = R$ 790,43` e `total_recusado = R$ 975,51`; recompõe cada total independentemente dos itens com decimal exato, verifica `total_solicitado = total_reembolsavel + total_recusado` e registra a correção do provisório de R$ 791,43 causada pelo limite de R$ 60,00 aplicado a d-014 após a migração decimal.
+  - **Testes:** `tests/integracao/totais-exemplo.test.js`, incluindo recomposição independente, d-014 e round-trip dos centavos.
+  - **Commit:** `test(T-015B): confirma totais após migração decimal`
 
 - [ ] **T-016 — README operacional**
   - **Atende:** rubrica de execução.
@@ -208,13 +224,15 @@
 | RN-007/A6/A9 | T-002, T-005 | período e competência |
 | RN-008/A1/A2 | T-007A, T-007B | associação, aplicação, múltiplos |
 | RN-009 | T-006 | duplicatas |
-| RN-010/A4 | T-003, T-011B | precisão e resíduos |
+| RN-010/A4 | T-003A, T-003B, T-003C, T-011B | decimal exato, parser, serialização e resíduos |
 | RN-011/A6 | T-005, T-017, T-013 | zero dentro/fora e totais |
 | Saída hospedagem/A7 | T-011C, T-014A | campos e omissão |
 | CLI e erros | T-014A, T-014B | sucesso e falhas |
-| Integração | T-015 | exemplo completo e totais |
-| Lista vazia | T-013, T-015 | resumo vazio e integração |
+| Integração | T-015A, T-015B | exemplo completo, serialização e totais |
+| Lista vazia | T-013, T-015A | resumo vazio e integração |
 
 ## Ordem sugerida de implementação
 
-T-001 → T-002 → T-003 → T-004 → T-005 → T-006 → T-017 → T-007A → T-008 → T-009 → T-010 → T-007B → T-011A → T-011B → T-011C → T-012 → T-013 → T-014A → T-014B → T-015A → T-015B → T-016 → T-018 → T-019.
+T-001 → T-002 → T-003A → T-003B → T-003C → T-004 → T-005 → T-006 → T-017 → T-007A → T-008 → T-009 → T-010 → T-007B → T-011A → T-011B → T-011C → T-012 → T-013 → T-014A → T-014B → T-015A → T-015B → T-016 → T-018 → T-019.
+
+T-003A, T-003B e T-003C devem passar antes de T-011B, T-013, T-015A e T-015B. Nenhuma dessas tasks pode ser marcada como concluída antes dos testes de decimal exato, parser lexical, serialização segura, distribuição por quociente/resto, recomposição dos totais e integração do exemplo passarem.
