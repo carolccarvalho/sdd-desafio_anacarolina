@@ -7,6 +7,10 @@ const base = despesas => ({ colaborador: { id: 'c', nome: 'N', centro_custo: 'CC
 const expense = (overrides = {}) => ({ id: 'x', data: '2026-07-10', categoria: 'alimentacao', descricao: 'refeicao', fornecedor: 'F', valor: 10, tem_nota_fiscal: true, ...overrides });
 
 test('RN-010 preserva três casas até arredondamento', () => assert.equal(roundHalfUp(33.333), 33.33));
+test('RN-010 usa half-up decimal em fronteiras binárias', () => {
+  assert.equal(roundHalfUp(1.005), 1.01);
+  assert.equal(roundHalfUp(2.675), 2.68);
+});
 test('D-004 d-011 é aprovado apesar do arredondamento de apresentação', () => {
   const item = calculate(base([expense({ id: 'd-011', valor: 33.333 })])).itens[0];
   assert.equal(item.valor_original, 33.333);
@@ -53,6 +57,14 @@ test('RN-008 aplica estorno sequencial somente ao elegível', () => {
   assert.equal(result.itens[1].status, 'recusado');
   assert.equal(result.itens[2].status, 'ignorado');
 });
+test('RN-008 preserva precisão decimal no estorno antes da saída', () => {
+  const result = calculate(base([
+    expense({ id: 'a', categoria: 'transporte_urbano', valor: 100, tem_nota_fiscal: true }),
+    expense({ id: 'r', categoria: 'transporte_urbano', valor: -45.123 })
+  ]));
+  assert.equal(result.itens[0].valor_reembolsavel, 54.88);
+  assert.equal(result.itens[0].status, 'aprovado');
+});
 test('RN-001 fecha limite por maiores restos', () => {
   const result = calculate(base([expense({ id: 'a', fornecedor: 'A', valor: 30.01 }), expense({ id: 'b', fornecedor: 'B', valor: 30.01 }), expense({ id: 'c', fornecedor: 'C', valor: 30.01 })]));
   assert.equal(result.itens.reduce((sum, item) => sum + item.valor_reembolsavel, 0), 60);
@@ -72,5 +84,5 @@ test('lista vazia produz totais zero', () => {
 });
 test('distribuição determinística por posição', () => {
   const items = [{ valorEfetivo: 1, posicaoEntrada: 0 }, { valorEfetivo: 1, posicaoEntrada: 1 }];
-  assert.deepEqual(allocateLargestRemainder(items, 1.01), [0.51, 0.5]);
+  assert.deepEqual(allocateLargestRemainder(items, 1.01).map(value => value.toString()), ['0.51', '0.5']);
 });

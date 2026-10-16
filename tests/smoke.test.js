@@ -24,3 +24,21 @@ test('política e cálculo de exemplo', async () => {
   assert.deepEqual(output.resumo, { total_solicitado: 1765.94, total_reembolsavel: 790.43, total_recusado: 975.51 });
   assert.equal(output.resumo.total_solicitado, output.resumo.total_reembolsavel + output.resumo.total_recusado);
 });
+
+test('serializa todos os valores monetários como numbers JSON', async () => {
+  const entrada = await loadInput('exemplos/despesas-exemplo.json');
+  const output = calculate(entrada);
+  assert.doesNotThrow(() => JSON.stringify(output));
+
+  const json = JSON.stringify(output);
+  const parsed = JSON.parse(json);
+
+  assert.equal(typeof parsed.resumo.total_solicitado, 'number');
+  assert.equal(typeof parsed.resumo.total_reembolsavel, 'number');
+  assert.equal(typeof parsed.resumo.total_recusado, 'number');
+
+  for (const item of parsed.itens) {
+    assert.equal(typeof item.valor_original, 'number');
+    assert.equal(typeof item.valor_reembolsavel, 'number');
+  }
+});

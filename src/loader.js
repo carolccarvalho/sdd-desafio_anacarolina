@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import Decimal from 'decimal.js';
 
 const isString = value => typeof value === 'string';
 const isDate = value => isString(value) && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -13,7 +14,7 @@ export function validateInput(data) {
   for (const expense of data.despesas) {
     if (!expense || !isString(expense.id) || !isDate(expense.data) || !isString(expense.categoria) || !isString(expense.descricao) || !isString(expense.fornecedor) || typeof expense.valor !== 'number' || !Number.isFinite(expense.valor) || typeof expense.tem_nota_fiscal !== 'boolean') throw new Error('Despesa inválida');
   }
-  return data;
+  return { ...data, despesas: data.despesas.map(expense => ({ ...expense, valor: new Decimal(String(expense.valor)) })) };
 }
 
 export async function loadInput(filePath) { return validateInput(JSON.parse(await fs.readFile(filePath, 'utf8'))); }
