@@ -64,10 +64,11 @@ function applyLimits(items) {
     const limit = category === 'hospedagem' ? group.reduce((sum, item) => sum + item.limite_item, 0) : LIMITES[category];
     if (category === 'hospedagem') for (const item of group) item.limite_grupo = roundHalfUp(limit);
     const total = group.reduce((sum, item) => sum + item.valorEfetivo, 0);
-    const values = total > limit ? allocateLargestRemainder(group, limit) : group.map(item => roundHalfUp(item.valorEfetivo));
+    const limited = total > limit;
+    const values = limited ? allocateLargestRemainder(group, limit) : group.map(item => item.valorEfetivo);
     group.forEach((item, index) => {
       item.valorReembolsavel = values[index];
-      item.status = values[index] < item.valorEfetivo ? 'aprovado_parcial' : 'aprovado';
+      item.status = limited && values[index] < item.valorEfetivo ? 'aprovado_parcial' : 'aprovado';
       item.motivo = item.status === 'aprovado_parcial' ? `Limite diário de ${category} atingido.` : 'Despesa elegível dentro da política';
     });
   }

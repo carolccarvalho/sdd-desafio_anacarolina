@@ -7,6 +7,12 @@ const base = despesas => ({ colaborador: { id: 'c', nome: 'N', centro_custo: 'CC
 const expense = (overrides = {}) => ({ id: 'x', data: '2026-07-10', categoria: 'alimentacao', descricao: 'refeicao', fornecedor: 'F', valor: 10, tem_nota_fiscal: true, ...overrides });
 
 test('RN-010 preserva três casas até arredondamento', () => assert.equal(roundHalfUp(33.333), 33.33));
+test('D-004 d-011 é aprovado apesar do arredondamento de apresentação', () => {
+  const item = calculate(base([expense({ id: 'd-011', valor: 33.333 })])).itens[0];
+  assert.equal(item.valor_original, 33.333);
+  assert.equal(item.valor_reembolsavel, 33.33);
+  assert.equal(item.status, 'aprovado');
+});
 test('RN-006 normaliza caixa e alias', () => {
   const result = calculate(base([expense({ id: 'a', categoria: 'ALIMENTACAO' }), expense({ id: 'b', categoria: 'alimentação' })]));
   assert.deepEqual(result.itens.map(item => item.categoria), ['alimentacao', 'alimentacao']);
@@ -41,7 +47,11 @@ test('RN-008 aplica estorno sequencial somente ao elegível', () => {
     expense({ id: 'b', categoria: 'transporte_urbano', valor: 100.01, tem_nota_fiscal: false }),
     expense({ id: 'r', categoria: 'transporte_urbano', valor: -45 })
   ]));
-  assert.equal(result.itens[0].valor_reembolsavel, 55); assert.equal(result.itens[1].status, 'recusado'); assert.equal(result.itens[2].status, 'ignorado');
+  assert.equal(result.itens[0].valor_original, 100);
+  assert.equal(result.itens[0].valor_reembolsavel, 55);
+  assert.equal(result.itens[0].status, 'aprovado');
+  assert.equal(result.itens[1].status, 'recusado');
+  assert.equal(result.itens[2].status, 'ignorado');
 });
 test('RN-001 fecha limite por maiores restos', () => {
   const result = calculate(base([expense({ id: 'a', fornecedor: 'A', valor: 30.01 }), expense({ id: 'b', fornecedor: 'B', valor: 30.01 }), expense({ id: 'c', fornecedor: 'C', valor: 30.01 })]));
@@ -50,6 +60,11 @@ test('RN-001 fecha limite por maiores restos', () => {
 test('RN-004 aplica limite parcial', () => {
   const result = calculate(base([expense({ valor: 70 })]));
   assert.equal(result.itens[0].valor_reembolsavel, 60); assert.equal(result.itens[0].status, 'aprovado_parcial');
+});
+test('D-004 distingue corte real por limite de arredondamento', () => {
+  const result = calculate(base([expense({ id: 'limitado', valor: 60.001 })]));
+  assert.equal(result.itens[0].valor_reembolsavel, 60);
+  assert.equal(result.itens[0].status, 'aprovado_parcial');
 });
 test('lista vazia produz totais zero', () => {
   const result = calculate(base([]));
