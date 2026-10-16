@@ -1,5 +1,7 @@
 # Relatório — Desafio SDD
 
+> Esqueleto preservado para preenchimento humano; não contém fatos, sessões ou evidências inventadas.
+
 **Aluno:** `<nome>` · **Repositório:** `<link>` · **Data:** `<data>`
 
 > Isto não é redação. São **evidências**. Toda afirmação deve vir acompanhada de

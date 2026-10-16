@@ -5,7 +5,8 @@
 
 ## Fase 1 — Fundação
 
-- [ ] **T-001 — Fundação do projeto**
+- [x] **T-001 — Fundação do projeto**
+  - **Registro desta execução:** `npm test` passou; commit `fc1b549`.
   - **Atende:** DT-003; estrutura técnica do plano.
   - **Depende de:** —
   - **Aceite:** scripts `start` e `test` executam; módulos/pastas-base existem.
