@@ -5,7 +5,9 @@
 > informação pessoal do aluno ou de sessões ainda não exportadas permanecem
 > explicitamente pendentes.
 
-**Aluno:** `<preencher pelo aluno>` · **Repositório:** `https://github.com/carolccarvalho/sdd-desafio_anacarolina` · **Data:** `2026-10-16`
+**Aluno:** `<preencher pelo aluno>` · **Repositório:** `https://github.com/carolccarvalho/sdd-desafio_anacarolina` · **Data:** `2026-10-19`
+
+**Atualização desta revisão:** a suíte executada em 2026-10-19 passou integralmente, com 34 testes aprovados e nenhum teste falho. O relatório também foi alinhado ao estado atual do repositório antes do commit desta atualização.
 
 ---
 
