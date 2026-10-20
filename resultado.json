@@ -1,0 +1,150 @@
+{
+  "colaborador": {
+    "id": "c-0417",
+    "nome": "Marina Volpi",
+    "centro_custo": "CC-ENG-PLATAFORMA"
+  },
+  "periodo": {
+    "competencia": "2026-07",
+    "inicio": "2026-07-01",
+    "fim": "2026-07-31"
+  },
+  "processado_em": "2026-10-16T20:08:38.644Z",
+  "resumo": {
+    "total_solicitado": 1765.94,
+    "total_reembolsavel": 790.43,
+    "total_recusado": 975.51
+  },
+  "itens": [
+    {
+      "id": "d-001",
+      "data": "2026-07-03",
+      "categoria": "alimentacao",
+      "valor_original": 72.5,
+      "valor_reembolsavel": 39.37,
+      "status": "aprovado_parcial",
+      "motivo": "Limite diário de alimentacao atingido."
+    },
+    {
+      "id": "d-002",
+      "data": "2026-07-03",
+      "categoria": "alimentacao",
+      "valor_original": 38,
+      "valor_reembolsavel": 20.63,
+      "status": "aprovado_parcial",
+      "motivo": "Limite diário de alimentacao atingido."
+    },
+    {
+      "id": "d-003",
+      "data": "2026-07-06",
+      "categoria": "transporte_urbano",
+      "valor_original": 100,
+      "valor_reembolsavel": 55,
+      "status": "aprovado",
+      "motivo": "Despesa elegível dentro da política"
+    },
+    {
+      "id": "d-004",
+      "data": "2026-07-06",
+      "categoria": "transporte_urbano",
+      "valor_original": 100.01,
+      "valor_reembolsavel": 0,
+      "status": "recusado",
+      "motivo": "Nota fiscal obrigatória para valores acima de R$ 100,00"
+    },
+    {
+      "id": "d-005",
+      "data": "2026-07-07",
+      "categoria": "coworking",
+      "valor_original": 89,
+      "valor_reembolsavel": 0,
+      "status": "recusado",
+      "motivo": "Categoria não coberta pela política de reembolso"
+    },
+    {
+      "id": "d-006",
+      "data": "2026-07-09",
+      "categoria": "alimentacao",
+      "valor_original": 54.9,
+      "valor_reembolsavel": 54.9,
+      "status": "aprovado",
+      "motivo": "Despesa elegível dentro da política"
+    },
+    {
+      "id": "d-007",
+      "data": "2026-07-09",
+      "categoria": "alimentacao",
+      "valor_original": 54.9,
+      "valor_reembolsavel": 0,
+      "status": "ignorado",
+      "motivo": "Duplicata da despesa d-006"
+    },
+    {
+      "id": "d-008",
+      "data": "2026-04-15",
+      "categoria": "alimentacao",
+      "valor_original": 41,
+      "valor_reembolsavel": 0,
+      "status": "ignorado",
+      "motivo": "Data fora do período de competência (2026-04-15 não está em 2026-07-01 a 2026-07-31)"
+    },
+    {
+      "id": "d-009",
+      "data": "2026-07-11",
+      "categoria": "transporte_urbano",
+      "valor_original": -45,
+      "valor_reembolsavel": 0,
+      "status": "ignorado",
+      "motivo": "Estorno: compensou despesas de transporte_urbano do fornecedor TaxiApp no período"
+    },
+    {
+      "id": "d-010",
+      "data": "2026-07-14",
+      "categoria": "hospedagem",
+      "valor_original": 480,
+      "valor_reembolsavel": 480,
+      "status": "aprovado",
+      "motivo": "Despesa elegível dentro da política",
+      "num_diarias": 2,
+      "limite_unitario_diaria": 250,
+      "limite_item": 500,
+      "limite_grupo": 500
+    },
+    {
+      "id": "d-011",
+      "data": "2026-07-15",
+      "categoria": "alimentacao",
+      "valor_original": 33.333,
+      "valor_reembolsavel": 33.33,
+      "status": "aprovado",
+      "motivo": "Despesa elegível dentro da política"
+    },
+    {
+      "id": "d-012",
+      "data": "2026-07-18",
+      "categoria": "alimentacao",
+      "valor_original": 47.2,
+      "valor_reembolsavel": 47.2,
+      "status": "aprovado",
+      "motivo": "Despesa elegível dentro da política"
+    },
+    {
+      "id": "d-013",
+      "data": "2026-07-22",
+      "categoria": "hospedagem",
+      "valor_original": 690,
+      "valor_reembolsavel": 0,
+      "status": "recusado",
+      "motivo": "Nota fiscal obrigatória para valores acima de R$ 100,00"
+    },
+    {
+      "id": "d-014",
+      "data": "2026-07-31",
+      "categoria": "alimentacao",
+      "valor_original": 61,
+      "valor_reembolsavel": 60,
+      "status": "aprovado_parcial",
+      "motivo": "Limite diário de alimentacao atingido."
+    }
+  ]
+}

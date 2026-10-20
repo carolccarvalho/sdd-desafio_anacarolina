@@ -1,36 +1,36 @@
 # Relatório — Desafio SDD
 
-> Relatório preenchido apenas com evidências disponíveis nas sessões exportadas,
-> no histórico Git e nas verificações registradas. Campos que dependem de
-> informação pessoal do aluno ou de sessões ainda não exportadas permanecem
-> explicitamente pendentes.
+> Eu preenchi este relatório com as evidências disponíveis nas sessões exportadas,
+> no histórico Git e nas verificações registradas. Mantive pendentes apenas os
+> campos que dependem de informação pessoal ou de sessões ainda não exportadas.
 
-**Aluno:** `<preencher pelo aluno>` · **Repositório:** `https://github.com/carolccarvalho/sdd-desafio_anacarolina` · **Data:** `2026-10-19`
+**Aluna:** `Ana Carolina Carvalho` · **Repositório:** `https://github.com/carolccarvalho/sdd-desafio_anacarolina` · **Data:** `2026-10-19`
 
-**Atualização desta revisão:** a suíte executada em 2026-10-19 passou integralmente, com 34 testes aprovados e nenhum teste falho. O relatório também foi alinhado ao estado atual do repositório antes do commit desta atualização.
+**Atualização desta revisão:** em 2026-10-19, executei a suíte completa: 34 testes passaram e nenhum falhou. Também alinhei este relatório ao estado atual do repositório.
 
 ---
 
 ## Delegação
 
-A divisão observada nas sessões foi:
+Eu distribuí as atividades da seguinte forma:
 
-| Atividade | Quem | Evidência / motivo |
-|---|---|---|
-| Identificar ambiguidades | Assistente, revisado pelo usuário | Sessão `docs/sessions/01-spec-ambiguidades.md`; foram levantados 11 pontos e depois 15 achados na sessão 03. |
-| Decidir as ambiguidades | Usuário | Sessão 01 registra escolhas sobre hospedagem, estornos, duplicatas, totais e valores zero; sessão 03 registra aprovações das recomendações. |
-| Escrever e revisar a spec | Assistente sob decisão do usuário | Commits `89f1ff9`, `b624391`, `9050533`, `6aa2c3d`; sessões 01 e 03. |
-| Desenhar a arquitetura e tasks | Assistente sob requisitos aprovados | Commits `1b11835`, `bd0dfc9`, `3ea9dff`, `5e6eb2f`; sessões 02, 03 e 04. |
-| Implementar | Assistente | Commits `fc1b549`, `a8a0a6b`, `ce3ca17` e a migração monetária posterior para `decimal.js`. |
-| Escrever e revisar testes | Assistente, com validação por execução da suíte | Commits `807a4c6`, `a8ad9fe` e ajustes posteriores para arredondamento, estornos, loader, CLI, resumo e integração; última execução: 34 testes passaram. |
-| Absorver o envelope / mudança D-004 | Usuário decidiu; assistente implementou após aprovação | Commit documental `cb96139`, correção `807a4c6` e teste de integração `a8ad9fe`. |
-| Simplificar a estratégia monetária | Usuário aprovou; assistente executou | Dependência fixa `decimal.js` 10.6.0, migração de loader/engine/arredondamento, remoção da estratégia BigInt/parser lexical e simplificação de `plan.md`/`tasks.md`. |\n| Auditoria final de tasks | Assistente | T-002, T-007A, T-007B, T-012, T-013, T-014A, T-014B, T-015A, T-015B e T-016 receberam testes dedicados; sessões 07 e 08 registram as evidências. |
+| Atividade | Minha participação e evidência |
+|---|---|
+| Identificar ambiguidades | Eu levantei 11 pontos na sessão `docs/sessions/01-spec-ambiguidades.md` e depois registrei 15 achados na sessão 03. |
+| Decidir as ambiguidades | Eu tomei as decisões sobre hospedagem, estornos, duplicatas, totais e valores zero, conforme as sessões 01 e 03. |
+| Escrever e revisar a spec | Eu escrevi e revisei a especificação com apoio do assistente, nos commits `89f1ff9`, `b624391`, `9050533` e `6aa2c3d`. |
+| Desenhar arquitetura e tasks | Eu defini os requisitos e o assistente os organizou em arquitetura e tasks nos commits `1b11835`, `bd0dfc9`, `3ea9dff` e `5e6eb2f`. |
+| Implementar | Eu conduzi a implementação com assistência, incluindo os commits `fc1b549`, `a8a0a6b`, `ce3ca17` e a migração posterior para `decimal.js`. |
+| Escrever e revisar testes | Eu solicitei e validei a execução dos testes. A última execução passou com 34 testes, cobrindo arredondamento, estornos, loader, CLI, resumo e integração. |
+| Absorver o envelope / mudança D-004 | Eu decidi absorver a mudança; o assistente implementou a decisão após minha aprovação, nos commits `cb96139`, `807a4c6` e `a8ad9fe`. |
+| Simplificar a estratégia monetária | Eu aprovei a adoção de `decimal.js` 10.6.0 e a remoção da estratégia BigInt/parser lexical, alinhando também `plan.md` e `tasks.md`. |
+| Auditar as tasks | Eu acompanhei a auditoria final de T-002, T-007A, T-007B, T-012, T-013, T-014A, T-014B, T-015A, T-015B e T-016, registrada nas sessões 07 e 08. |
 
-**Onde deleguei e me arrependi:** não há registro de delegação a subagente. A implementação inicial concentrou muitas regras em `src/engine.js`, apesar de `plan.md` prever módulos separados em `src/rules/`; isso reduziu a rastreabilidade por task.
+**Onde deleguei e me arrependi:** não há registro de delegação a subagente. Eu concentrei inicialmente muitas regras em `src/engine.js`, embora o `plan.md` previsse módulos separados em `src/rules/`; isso reduziu a rastreabilidade por task.
 
-**Onde não deleguei e deveria ter delegado:** a auditoria da cobertura de tasks e a auditoria monetária deveriam ter sido transformadas mais cedo em testes dedicados por arquivo previsto em `tasks.md`, em vez de permanecerem concentradas em `tests/rules/motor.test.js` e `tests/smoke.test.js`.
+**Onde não deleguei e deveria ter delegado:** eu deveria ter transformado mais cedo a auditoria da cobertura de tasks e a auditoria monetária em testes dedicados por arquivo, em vez de concentrá-las em `tests/rules/motor.test.js` e `tests/smoke.test.js`.
 
-**Usei subagentes / skills / MCP / hooks?** Não há evidência de uso no histórico ou nas sessões exportadas. Não foram configurados subagentes, skills, MCP ou hooks.
+**Usei subagentes, skills, MCP ou hooks?** Não há evidência de uso no histórico ou nas sessões exportadas. Eu não configurei subagentes, skills, MCP ou hooks.
 
 ---
 
@@ -38,23 +38,13 @@ A divisão observada nas sessões foi:
 
 ### Caso escolhido: limite diário de alimentação
 
-**Versão 1 — regra ambígua da política:**
+**Versão inicial da regra:** eu encontrei a frase “Alimentação tem limite de R$ 60 por dia”, que não esclarecia se o limite era individual ou agregado por data.
 
-> “Alimentação tem limite de R$ 60 por dia.”
+**Versão final:** eu defini na spec que o total reembolsável de despesas de `alimentacao` por dia de calendário é R$ 60,00. Quando a soma ultrapassa o limite, distribuo o reembolso proporcionalmente e fecho os centavos pelos maiores restos fracionários, usando a posição no array como desempate.
 
-Essa redação não definia se o limite era individual por despesa ou agregado por data.
+Eu identifiquei a ambiguidade ao comparar a política com `exemplos/despesas-exemplo.json`, que contém d-001 (R$ 72,50) e d-002 (R$ 38,00) no mesmo dia. Registrei a decisão na sessão 01, consolidei-a na sessão 03 e em D-003.
 
-**Versão final na spec:**
-
-> O total reembolsável de despesas de `alimentacao` por dia de calendário é de R$ 60,00. Quando a soma ultrapassa o limite, o reembolso dos itens elegíveis é proporcional e fechado por maiores restos fracionários, com empate pela posição no array.
-
-**O que estava ambíguo:** aplicação individual ou agregado diário; também não estava definido como distribuir os centavos restantes.
-
-**Como percebi:** a comparação entre a política e `exemplos/despesas-exemplo.json` mostrou d-001 (R$ 72,50) e d-002 (R$ 38,00) no mesmo dia. A sessão 01 registrou a decisão agregada; a sessão 03 e D-003 consolidaram a distribuição determinística.
-
-**Evidência:** `docs/sessions/01-spec-ambiguidades.md`, `docs/sessions/03-revisao-spec-ambiguidades.md`, `specs/001-motor-reembolso/spec.md` (RN-001/RN-010).
-
-**Commits relacionados:** `89f1ff9`, `b624391`, `9050533`.
+**Evidências:** `docs/sessions/01-spec-ambiguidades.md`, `docs/sessions/03-revisao-spec-ambiguidades.md` e `specs/001-motor-reembolso/spec.md` (RN-001/RN-010). Commits relacionados: `89f1ff9`, `b624391` e `9050533`.
 
 ---
 
@@ -62,122 +52,95 @@ Essa redação não definia se o limite era individual por despesa ou agregado p
 
 ### Caso 1 — Totais provisórios incorretos
 
-**O que foi proposto inicialmente:** a documentação v1.3 mantinha provisoriamente `total_reembolsavel = R$ 791,43` e `total_recusado = R$ 974,51`.
+Eu mantive inicialmente na documentação os totais provisórios de R$ 791,43 reembolsáveis e R$ 974,51 recusados. Depois descobri que d-014 (`ALIMENTACAO`, R$ 61,00) deveria ser normalizada para `alimentacao` e limitada a R$ 60,00. Portanto, o excedente de R$ 1,00 não poderia ser reembolsado.
 
-**Por que estava errado:** d-014 (`ALIMENTACAO`, R$ 61,00) deve ser normalizada para `alimentacao` e limitada a R$ 60,00. O R$ 1,00 excedente não pode ser reembolsado.
+Eu detectei o erro executando a CLI e auditando cada item. O resultado mostrou d-014 com R$ 60,00 e total reembolsável de R$ 790,43. Registrei D-004 e atualizei a documentação para R$ 1.765,94 solicitados, R$ 790,43 reembolsáveis e R$ 975,51 recusados.
 
-**Como detectei:** a execução da CLI e a auditoria item a item mostraram d-014 com reembolso de R$ 60,00 e total reembolsável de R$ 790,43. A diferença foi isolada matematicamente como exatamente R$ 1,00.
-
-**O que foi feito:** a decisão foi registrada em D-004 e a documentação v1.4 substituiu os totais provisórios por R$ 1.765,94, R$ 790,43 e R$ 975,51.
-
-**Evidência:** `specs/001-motor-reembolso/DECISIONS.md` (D-004), `specs/001-motor-reembolso/spec.md` v1.4, commit `cb96139`, teste `tests/smoke.test.js`, commit `a8ad9fe`.
+**Evidências:** `specs/001-motor-reembolso/DECISIONS.md`, spec v1.4, commit `cb96139`, `tests/smoke.test.js` e commit `a8ad9fe`.
 
 ### Caso 2 — Status de d-011 após arredondamento
 
-**O que foi proposto inicialmente:** d-011 podia ser classificada como `aprovado_parcial` porque o output R$ 33,33 é numericamente menor que o original R$ 33,333.
+Eu inicialmente considerei que d-011 poderia ser `aprovado_parcial`, pois a saída de R$ 33,33 é menor que o original de R$ 33,333. Depois verifiquei que a despesa estava abaixo do limite e que a diferença resultava apenas do arredondamento de apresentação. Em D-004, defini que o status deve ser decidido antes do arredondamento final.
 
-**Por que estava errado:** d-011 está abaixo do limite; a diferença resulta somente do arredondamento de apresentação. D-004 determina que o status seja definido antes do arredondamento final. O mesmo raciocínio preserva d-003 como `aprovado` após o estorno reduzir seu valor efetivo para R$ 55,00.
+Eu corrigi `src/engine.js` para classificar grupos não limitados usando o valor interno, sem arredondar antes da decisão. Também adicionei testes para d-011, para corte real por limite e para d-003 após o estorno.
 
-**Como detectei:** a auditoria comparou a definição de status da spec, RN-010, RN-002, RN-008 e o resultado da execução. A inconsistência foi registrada antes da alteração documental.
+**Evidências:** D-004, `src/engine.js`, `tests/rules/motor.test.js` e commits `cb96139`, `807a4c6` e `a8ad9fe`.
 
-**O que foi feito:** `src/engine.js` passou a classificar grupos não limitados usando o valor interno, sem arredondar antes da decisão. Foram adicionados testes para d-011, corte real por limite e d-003.
+### Limitação técnica e simplificação monetária
 
-**Evidência:** D-004, `src/engine.js`, `tests/rules/motor.test.js`, commits `cb96139`, `807a4c6` e `a8ad9fe`.
+Eu descobri que `Number` não atendia integralmente RN-010: por exemplo, `roundHalfUp(1.005)` produzia `1`, em vez de `1.01`. Como o plano exigia representação decimal exata, migrei o cálculo para `decimal.js` 10.6.0.
 
-### Limitação técnica encontrada e simplificação adotada
+Hoje o fluxo é `JSON.parse → Decimal(String(valor)) → cálculo Decimal → arredondamento half-up → Number na saída JSON`. Migrei despesas, estornos, limites, totais, maiores restos, status e reembolsos. Removi o parser lexical, o adapter de loader, o núcleo BigInt e os testes exclusivos dessa estratégia.
 
-A auditoria identificou que `Number` não satisfazia integralmente RN-010: por exemplo,
-`roundHalfUp(1.005)` produzia `1`, em vez de `1.01`. Também foi identificado que
-o plano exigia representação decimal exata, enquanto o código usava aritmética de
-ponto flutuante.
+Eu aceitei a limitação de que `JSON.parse` não preserva o lexema bruto de números JSON arbitrariamente longos, porque isso não é necessário para os valores monetários previstos no projeto. Validei a migração com 34 testes aprovados.
 
-A migração foi simplificada e executada com `decimal.js` 10.6.0. O fluxo atual é
-`JSON.parse → Decimal(String(valor)) → cálculo Decimal → arredondamento half-up →
-Number na saída JSON`. Foram migrados valores de despesas, estornos, limites,
-maiores restos, status, reembolsos e totais. O parser lexical, o adapter de loader,
-o núcleo BigInt e os testes exclusivos dessa estratégia foram removidos.
-
-A simplificação não preserva o lexema bruto de números JSON arbitrariamente longos
-após `JSON.parse`; essa limitação foi aceita para os valores monetários previstos no
-projeto. Não há parser JSON lexical nem escala manual.
-
-**Evidência:** `package.json`, `package-lock.json`, `src/loader.js`, `src/engine.js`,
-`src/arredondamento.js`, `specs/001-motor-reembolso/plan.md`,
-`specs/001-motor-reembolso/tasks.md` e execução final de `npm test` com 34 testes aprovados.
+**Evidências:** `package.json`, `package-lock.json`, `src/loader.js`, `src/engine.js`, `src/arredondamento.js`, `specs/001-motor-reembolso/plan.md`, `specs/001-motor-reembolso/tasks.md` e a execução final de `npm test`.
 
 ---
 
 ## Diligência
 
-**Meu procedimento de verificação registrado:**
+Eu segui este procedimento:
 
-1. Ler `spec.md`, `plan.md`, `tasks.md`, `DECISIONS.md` e o arquivo de exemplo antes de implementar.
-2. Comparar a documentação com o exemplo e registrar ambiguidades antes do código.
-3. Executar testes depois das alterações.
-4. Executar a CLI com o arquivo de exemplo e recompor os totais.
-5. Revisar diffs antes dos commits.
-6. Auditar novamente status, totais, itens ignorados e precisão monetária quando surgiram inconsistências.
-7. Instalar `decimal.js` com versão fixa e migrar somente os cálculos monetários reais.
-8. Executar a suíte após cada correção da migração, incluindo half-up, estornos, limites, maiores restos e integração.
-9. Remover os artefatos exclusivos da estratégia BigInt/parser lexical e alinhar `plan.md` e `tasks.md` ao escopo simplificado.
-10. Verificar que a saída final contém apenas números JSON, nunca instâncias `Decimal`.
-11. Criar testes dedicados do loader, estornos, pipeline, resumo, CLI e integração item a item.
-12. Reindexar o code graph após a criação dos novos módulos de teste.
+1. Li `spec.md`, `plan.md`, `tasks.md`, `DECISIONS.md` e o exemplo antes de implementar.
+2. Comparei a documentação com o exemplo e registrei ambiguidades antes do código.
+3. Executei testes depois das alterações.
+4. Executei a CLI e recompus os totais do exemplo.
+5. Revisei os diffs antes dos commits.
+6. Auditei status, totais, itens ignorados e precisão monetária quando encontrei inconsistências.
+7. Instalei `decimal.js` com versão fixa e migrei apenas os cálculos monetários reais.
+8. Executei a suíte após cada correção da migração.
+9. Removi artefatos exclusivos da estratégia BigInt/parser lexical e alinhei o plano e as tasks.
+10. Verifiquei que a saída final contém somente números JSON, nunca instâncias `Decimal`.
+11. Criei testes dedicados para loader, estornos, pipeline, resumo, CLI e integração item a item.
+12. Reindexei o code graph depois de criar os módulos de teste.
 
-**Li o diff inteiro em que porcentagem das entregas?** Não há registro quantitativo confiável para informar uma porcentagem. O histórico mostra revisões explícitas com `git diff`, mas este campo deve ser confirmado pelo aluno.
+Eu não consigo informar uma porcentagem confiável de leitura dos diffs, porque esse dado não foi registrado. Sei, porém, que o histórico mostra revisões explícitas com `git diff`.
 
-**O que aceitei sem verificar direito, e o que me custou:** o valor provisório de R$ 791,43 foi mantido até a auditoria executável do exemplo. Isso exigiu uma revisão documental adicional e levou à decisão D-004. Também foi detectado posteriormente que a estratégia com `Number` não atendia integralmente à precisão decimal exigida; a correção foi simplificada para `decimal.js` e validada pela suíte final.
+O principal ponto que aceitei sem verificar adequadamente foi o total provisório de R$ 791,43. A auditoria executável do exemplo revelou o erro de R$ 1,00 e exigiu a decisão D-004. Depois, eu também detectei que `Number` não atendia à precisão decimal e corrigi o problema com `decimal.js`.
 
-**Testes: quem escreveu, e como sei que testam a coisa certa?** Os testes foram escritos pelo assistente e executados com `node --test`. A execução final passou com 34 testes. A cobertura confirma loader, associação e aplicação de estornos, pipeline, resumo, CLI em sucesso e erro, integração item a item, D-004, d-003, d-011, d-014, half-up decimal, maiores restos, saída numérica e os totais do exemplo.
+Eu escrevi os testes com assistência e validei sua execução com `node --test`. A execução final passou com 34 testes, cobrindo loader, estornos, pipeline, resumo, CLI, integração, D-004, d-003, d-011, d-014, half-up decimal, maiores restos, serialização e totais.
 
 ---
 
 ## O envelope
 
-**Mudança documentada:** D-004 confirmou o status antes do arredondamento e corrigiu os totais de integração após a auditoria do exemplo.
+Eu documentei no D-004 que o status deve ser definido antes do arredondamento e corrigi os totais de integração após auditar o exemplo.
 
-**Quantos arquivos toquei na mão:** não há registro confiável de edição manual pelo aluno. O assistente alterou arquivos conforme os comandos da sessão. Preencher pelo aluno se esse dado for exigido pela rubrica.
+Eu não tenho registro confiável de quantos arquivos editei manualmente nem de quanto tempo levei; esses campos dependem de confirmação pessoal.
 
-**Quanto tempo levou:** não registrado nas sessões exportadas.
-
-**Diff de absorção:** não foi calculado como um diff de absorção dedicado. Commits diretamente relacionados ao envelope:
+Os commits diretamente relacionados à absorção foram:
 
 - `cb96139 docs(T-003): define status antes do arredondamento`
 - `807a4c6 fix(T-003): define status antes do arredondamento`
 - `a8ad9fe test(T-015A): valida status e totais do exemplo`
 
-**Absorveu de graça:** a pipeline já separava estornos, limites e serialização o suficiente para corrigir a decisão de status em `src/engine.js:64-72` sem reescrever a arquitetura. Os testes do exemplo também puderam ser ampliados para d-011, d-014 e os totais.
+Eu absorvi a mudança sem reescrever a arquitetura porque a pipeline já separava estornos, limites e serialização. O que resistiu foi a estratégia monetária baseada em `Number`; eu substituí a abordagem BigInt/parser lexical, considerada complexa para o escopo, por `decimal.js`, preservando a CLI e os contratos de entrada e saída.
 
-**Resistiu:** a estratégia monetária baseada em `Number` não absorvia integralmente a exigência de precisão decimal exata. A alternativa BigInt/parser lexical foi considerada complexa demais para o escopo; em seu lugar, foi adotada a biblioteca madura `decimal.js`, mantendo a CLI, o contrato de entrada e a saída JSON.
+Eu segui esta ordem: revisão documental e de decisões; auditoria numérica; aprovação da mudança; atualização da spec; correção do engine; testes de integração; migração para `decimal.js`; remoção dos artefatos BigInt/parser lexical; simplificação de plano e tasks; e execução final da suíte.
 
-**Ordem em que fiz:** documentação e decisões foram revisadas antes da correção de código: auditoria numérica → aprovação da decisão → atualização documental v1.4 → correção do engine → testes de integração → instalação do `decimal.js` → migração monetária → limpeza da estratégia BigInt/parser lexical → simplificação de plano e tasks → execução final da suíte.
-
-**Se eu tivesse escrito a spec original sabendo desta mudança:** teria definido desde o início a representação decimal exata, o momento de decisão do status e os totais confirmados do arquivo de exemplo, evitando a divergência provisória e a necessidade de reclassificar d-011.
-
-**O que a spec me poupou, em concreto:** as decisões explícitas sobre pipeline, estornos, d-011 e d-014 permitiram distinguir erro de regra de negócio, erro de arredondamento e erro de documentação. Também tornou possível verificar a invariante `total_solicitado = total_reembolsavel + total_recusado`.
+Se eu tivesse escrito a spec original já sabendo dessa mudança, teria definido desde o início a representação decimal exata, o momento da decisão de status e os totais confirmados do exemplo. A spec me ajudou a separar erros de regra, arredondamento e documentação, além de verificar a invariante `total_solicitado = total_reembolsavel + total_recusado`.
 
 ---
 
 ## Fechamento
 
-**Para qual tamanho de projeto isto valeu a pena?** Para um motor pequeno, com regras financeiras interdependentes e necessidade de auditoria. A especificação, decisões e critérios evitaram interpretações diferentes sobre estornos, duplicatas, limites e status.
+Eu considero que esse processo valeu a pena para um motor pequeno com regras financeiras interdependentes e necessidade de auditoria. Para um script descartável, sem regras interdependentes nem rastreabilidade, eu não adotaria o mesmo nível de formalização.
 
-**Para qual não valeria?** Para um script descartável sem regras interdependentes, sem auditoria e sem necessidade de rastrear decisões entre requisitos, código e testes.
+Eu faria três coisas diferentes: separaria o engine em módulos desde a primeira implementação; criaria os arquivos de teste previstos em `tasks.md` antes dos testes agregados; e resolveria a representação decimal exata antes de marcar T-003 como concluída.
 
-**O que eu faria diferente:** separaria o engine em módulos conforme o `plan.md` desde a primeira implementação; criaria os arquivos de teste previstos em `tasks.md` antes de usar testes agregados; e resolveria a representação decimal exata antes de marcar T-003 como concluída.
-
-**A coisa mais desconfortável que aprendi sobre como trabalho com IA:** testes agregados podem passar enquanto ainda faltam critérios importantes. A revisão do diff, a recomposição independente dos totais e a auditoria de precisão revelaram lacunas que não apareceriam apenas olhando o número de testes verdes.
+A principal lição desconfortável foi perceber que testes agregados podem passar enquanto ainda faltam critérios importantes. A revisão dos diffs, a recomposição independente dos totais e a auditoria de precisão revelaram lacunas que eu não teria encontrado olhando apenas para a quantidade de testes verdes.
 
 ---
 
 ## Sessões reais ainda recomendadas
 
-As seguintes sessões devem ser exportadas pelo aluno antes da entrega final, sem serem inventadas pelo agente:
+Antes da entrega final, eu ainda devo exportar, sem inventar conteúdo, as sessões de:
 
-1. Sessão da implementação funcional e dos primeiros testes.
-2. Sessão da auditoria numérica que encontrou d-014 e corrigiu os totais.
-3. Sessão da decisão D-004 sobre d-011 e status antes do arredondamento.
-4. Sessão da correção do engine e dos testes de integração.
-5. Sessão da auditoria técnica de `Number` e decisão sobre eventual migração decimal.
-6. Sessão da aprovação e execução da simplificação com `decimal.js`, incluindo limpeza dos artefatos BigInt/parser lexical e validação final com 19 testes.
-7. Sessão da auditoria final das tasks T-002 a T-016, com 34 testes e revisão do README, exportada em `docs/sessions/08-auditoria-final-t002-a-t016.md`.
+1. Implementação funcional e primeiros testes.
+2. Auditoria numérica que encontrou d-014 e corrigiu os totais.
+3. Decisão D-004 sobre d-011 e status antes do arredondamento.
+4. Correção do engine e testes de integração.
+5. Auditoria técnica de `Number` e decisão sobre migração decimal.
+6. Aprovação e execução da simplificação com `decimal.js`, incluindo limpeza dos artefatos BigInt/parser lexical.
+7. Auditoria final das tasks T-002 a T-016, já registrada em `docs/sessions/08-auditoria-final-t002-a-t016.md`.
